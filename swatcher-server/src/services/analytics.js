@@ -235,6 +235,28 @@ async function getEngagementDetail(ritm) {
     SELECT tool, COUNT(*) as count FROM traffic_logs WHERE ritm = ? GROUP BY tool
   `, [eng.ritm]);
 
+  const latestLog = await db.get(`
+    SELECT MAX(timestamp) as last_collected_at
+    FROM traffic_logs
+    WHERE ritm = ?
+  `, [eng.ritm]);
+
+  const dailyTimeline = await db.all(`
+    SELECT SUBSTR(timestamp, 1, 10) as log_date, COUNT(*) as request_count
+    FROM traffic_logs
+    WHERE ritm = ?
+    GROUP BY SUBSTR(timestamp, 1, 10)
+    ORDER BY log_date ASC
+  `, [eng.ritm]);
+
+  const hourlyTimeline = await db.all(`
+    SELECT SUBSTR(timestamp, 1, 13) as log_hour, COUNT(*) as request_count
+    FROM traffic_logs
+    WHERE ritm = ?
+    GROUP BY SUBSTR(timestamp, 1, 13)
+    ORDER BY log_hour ASC
+  `, [eng.ritm]);
+
   return {
     engagement: {
       id: eng.id,
@@ -248,11 +270,17 @@ async function getEngagementDetail(ritm) {
       automated_hours: (autoMins / 60).toFixed(1),
       completion_percentage: completionPct,
       status: eng.status,
-      created_at: eng.created_at
+      created_at: eng.created_at,
+      last_collected_at: latestLog?.last_collected_at || eng.created_at
     },
     testers: testerStats,
     tools,
-    endpoints
+    endpoints,
+    timeline: {
+      daily: dailyTimeline.map(d => ({ date: d.log_date, count: parseInt(d.request_count, 10) })),
+      hourly: hourlyTimeline.map(h => ({ hour: h.log_hour, count: parseInt(h.request_count, 10) })),
+      last_collected_at: latestLog?.last_collected_at || null
+    }
   };
 }
 
