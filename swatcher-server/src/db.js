@@ -178,6 +178,8 @@ const db = {
       CREATE INDEX IF NOT EXISTS idx_engagements_ritm ON engagements(ritm);
       CREATE INDEX IF NOT EXISTS idx_engagements_appid ON engagements(application_id);
       CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at);
+      CREATE INDEX IF NOT EXISTS idx_sessions_user ON leadership_sessions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_sessions_ended ON leadership_sessions(ended_at);
     `);
     console.log('[swatcher-db] PostgreSQL Schema and Indexes verified successfully.');
   },

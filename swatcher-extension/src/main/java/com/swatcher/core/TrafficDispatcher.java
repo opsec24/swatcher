@@ -24,6 +24,13 @@ public class TrafficDispatcher {
     private final Thread workerThread;
     private volatile boolean running = true;
     private volatile boolean serverOnline = true;
+    private volatile boolean authValid = true;
+
+    public enum UploadResult {
+        SUCCESS,
+        AUTH_REJECTED,
+        NETWORK_OFFLINE
+    }
 
     private final AtomicLong totalBuffered = new AtomicLong(0);
     private final AtomicLong totalUploaded = new AtomicLong(0);
@@ -113,13 +120,20 @@ public class TrafficDispatcher {
             return;
         }
 
-        boolean success = executeHttpBatchUpload(batch);
-        if (success) {
+        UploadResult result = executeHttpBatchUpload(batch);
+        if (result == UploadResult.SUCCESS) {
             serverOnline = true;
+            authValid = true;
             totalUploaded.addAndGet(batch.size());
             if (offlineQueue.hasPendingEvents()) {
                 drainOfflineQueue();
             }
+        } else if (result == UploadResult.AUTH_REJECTED) {
+            serverOnline = true; // Server IS online!
+            authValid = false;
+            SessionManager.getInstance().markTokenRejected("API Token rejected by server (HTTP 401/403).");
+            offlineQueue.appendEvents(batch);
+            totalFailed.addAndGet(batch.size());
         } else {
             serverOnline = false;
             offlineQueue.appendEvents(batch);
@@ -142,13 +156,20 @@ public class TrafficDispatcher {
             List<TrafficEvent> chunk = offlineQueue.peekBatch(50);
             if (chunk.isEmpty()) break;
 
-            boolean success = executeHttpBatchUpload(chunk);
-            if (success) {
+            UploadResult result = executeHttpBatchUpload(chunk);
+            if (result == UploadResult.SUCCESS) {
                 serverOnline = true;
+                authValid = true;
                 offlineQueue.commitRemove(chunk.size());
                 totalUploaded.addAndGet(chunk.size());
                 notifyStats();
                 pass++;
+            } else if (result == UploadResult.AUTH_REJECTED) {
+                serverOnline = true;
+                authValid = false;
+                SessionManager.getInstance().markTokenRejected("Offline replay halted: API Key rejected (HTTP 401/403).");
+                notifyStats();
+                break;
             } else {
                 serverOnline = false;
                 notifyStats();
@@ -161,8 +182,8 @@ public class TrafficDispatcher {
         }
     }
 
-    private boolean executeHttpBatchUpload(List<TrafficEvent> batch) {
-        if (batch.isEmpty()) return true;
+    private UploadResult executeHttpBatchUpload(List<TrafficEvent> batch) {
+        if (batch.isEmpty()) return UploadResult.SUCCESS;
 
         String serverUrl = SessionManager.getInstance().getServerUrl();
         String apiKey = SessionManager.getInstance().getApiKey();
@@ -204,9 +225,15 @@ public class TrafficDispatcher {
             }
 
             int code = conn.getResponseCode();
-            return (code >= 200 && code < 300);
+            if (code >= 200 && code < 300) {
+                return UploadResult.SUCCESS;
+            } else if (code == 401 || code == 403) {
+                return UploadResult.AUTH_REJECTED;
+            } else {
+                return UploadResult.NETWORK_OFFLINE;
+            }
         } catch (Exception e) {
-            return false;
+            return UploadResult.NETWORK_OFFLINE;
         } finally {
             if (conn != null) {
                 try { conn.disconnect(); } catch (Exception ignored) {}
@@ -235,6 +262,10 @@ public class TrafficDispatcher {
 
     public boolean isServerOnline() {
         return serverOnline;
+    }
+
+    public boolean isAuthValid() {
+        return authValid;
     }
 
     public long getOfflineCount() {

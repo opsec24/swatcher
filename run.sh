@@ -287,7 +287,7 @@ echo -e "  ${BOLD}Key Verification API:${NC}      ${CYAN}http://0.0.0.0:${APP_PO
 echo -e "  ${BOLD}Database Engine:${NC}           PostgreSQL 16 (Enterprise Persistent Volume)"
 echo ""
 echo -e "${BOLD}FIRST-TIME INITIALIZATION STEPS:${NC}"
-echo -e "  1. Open ${CYAN}http://${PUBLIC_IP}:${APP_PORT}/${NC} in your browser."
+echo -e "  1. Open ${CYAN}http://0.0.0.0:${APP_PORT}/${NC} (or ${CYAN}http://localhost:${APP_PORT}/${NC}) in your browser."
 echo -e "  2. You will be greeted by the ${BOLD}First-Time Setup Wizard${NC}."
 echo -e "  3. Create your initial Leadership Admin account (enforces password complexity: min 10 chars,"
 echo -e "     1 uppercase, 1 lowercase, 1 number, 1 special character)."

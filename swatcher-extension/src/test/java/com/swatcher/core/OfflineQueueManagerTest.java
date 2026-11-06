@@ -83,4 +83,26 @@ public class OfflineQueueManagerTest {
         assertEquals(0, queueManager.getOfflineCount());
         assertFalse(queueManager.hasPendingEvents());
     }
+
+    @Test
+    public void testBlankLinesResilience() throws Exception {
+        // Manually write file with empty lines interspersed
+        java.nio.file.Files.writeString(queueFile.toPath(),
+                "{\"event_id\":\"ev-1\"}\n\n  \n{\"event_id\":\"ev-2\"}\n\n{\"event_id\":\"ev-3\"}\n");
+
+        OfflineQueueManager qm = new OfflineQueueManager();
+        assertEquals(3, qm.getOfflineCount());
+
+        List<TrafficEvent> batch = qm.peekBatch(2);
+        assertEquals(2, batch.size());
+        assertEquals("ev-1", batch.get(0).event_id);
+        assertEquals("ev-2", batch.get(1).event_id);
+
+        qm.commitRemove(2);
+        assertEquals(1, qm.getOfflineCount());
+
+        List<TrafficEvent> remaining = qm.peekBatch(5);
+        assertEquals(1, remaining.size());
+        assertEquals("ev-3", remaining.get(0).event_id);
+    }
 }

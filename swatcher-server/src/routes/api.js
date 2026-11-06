@@ -43,7 +43,11 @@ const setupLimiter = rateLimit({
 });
 
 function getClientIp(req) {
-  return req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    return String(forwarded).split(',')[0].trim();
+  }
+  return req.socket?.remoteAddress || '127.0.0.1';
 }
 
 /**
@@ -415,6 +419,9 @@ router.post('/engagements/batch-delete', authenticateLeader, async (req, res) =>
     if (!Array.isArray(ritms) || ritms.length === 0) {
       return res.status(400).json({ error: 'ritms array is required' });
     }
+    if (ritms.length > 100) {
+      return res.status(400).json({ error: 'Batch delete limit is 100 engagements per request.' });
+    }
 
     let deletedCount = 0;
     let totalPurgedLogs = 0;
@@ -550,6 +557,9 @@ router.post('/pentesters/batch-delete', authenticateLeader, async (req, res) => 
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ error: 'ids array is required' });
     }
+    if (ids.length > 100) {
+      return res.status(400).json({ error: 'Batch delete limit is 100 pentesters per request.' });
+    }
 
     let deletedCount = 0;
     for (const id of ids) {
@@ -680,9 +690,13 @@ router.post('/ingest/batch', authenticateIngestion, async (req, res) => {
     if (!Array.isArray(batch) || batch.length === 0) {
       return res.status(400).json({ error: 'batch must be a non-empty array of traffic records' });
     }
+    if (batch.length > 500) {
+      return res.status(400).json({ error: 'Batch size exceeds maximum limit of 500 records per request.' });
+    }
 
     const now = new Date().toISOString();
     let ingested = 0;
+    const engagementCache = new Map();
 
     for (const item of batch) {
       const eventId = item.event_id || crypto.randomUUID();
@@ -690,15 +704,19 @@ router.post('/ingest/batch', authenticateIngestion, async (req, res) => {
       const itemAppId = (item.engagement?.application_id || engagement?.application_id || 'UNKNOWN').trim().toUpperCase();
       const effortHours = parseFloat(item.engagement?.allocated_hours || engagement?.allocated_hours) || 40.0;
 
-      let engRecord = await db.get('SELECT * FROM engagements WHERE ritm = ?', [itemRitm]);
-      if (!engRecord && itemRitm !== 'UNKNOWN') {
-        const engId = `eng_${itemRitm}_${Date.now()}`;
-        try {
-          await db.run('INSERT INTO engagements (id, ritm, application_id, client_name, allocated_hours, status, created_at) VALUES (?, ?, ?, \'\', ?, \'ACTIVE\', ?)', [
-            engId, itemRitm, itemAppId, effortHours, now
-          ]);
-          engRecord = { id: engId, ritm: itemRitm, application_id: itemAppId, allocated_hours: effortHours };
-        } catch (_) {}
+      let engRecord = engagementCache.get(itemRitm);
+      if (engRecord === undefined) {
+        engRecord = await db.get('SELECT * FROM engagements WHERE ritm = ?', [itemRitm]);
+        if (!engRecord && itemRitm !== 'UNKNOWN') {
+          const engId = `eng_${itemRitm}_${Date.now()}`;
+          try {
+            await db.run('INSERT INTO engagements (id, ritm, application_id, client_name, allocated_hours, status, created_at) VALUES (?, ?, ?, \'\', ?, \'ACTIVE\', ?)', [
+              engId, itemRitm, itemAppId, effortHours, now
+            ]);
+            engRecord = { id: engId, ritm: itemRitm, application_id: itemAppId, allocated_hours: effortHours };
+          } catch (_) {}
+        }
+        engagementCache.set(itemRitm, engRecord);
       }
 
       const resolvedAppId = engRecord ? engRecord.application_id : itemAppId;
@@ -712,7 +730,17 @@ router.post('/ingest/batch', authenticateIngestion, async (req, res) => {
       const timestamp = reqData.timestamp || item.timestamp || now;
       const method = (reqData.method || 'GET').toUpperCase();
       const url = reqData.url || '';
-      const host = reqData.host || (url ? new URL(url).hostname : 'unknown');
+
+      let host = reqData.host;
+      if (!host) {
+        try {
+          host = url ? new URL(url).hostname : 'unknown';
+        } catch (_) {
+          host = 'unknown';
+        }
+      }
+      if (!host) host = 'unknown';
+
       const port = reqData.port || 443;
       const path = reqData.path || '/';
       const query = reqData.query || '';
@@ -729,13 +757,14 @@ router.post('/ingest/batch', authenticateIngestion, async (req, res) => {
 
       try {
         await db.run(`
-          INSERT OR IGNORE INTO traffic_logs (
+          INSERT INTO traffic_logs (
             event_id, session_id, ritm, application_id, tester_id, tester_username, tester_machine,
             tool, timestamp, method, url, host, port, path, query,
             request_headers, request_body, request_body_length,
             status_code, response_headers, response_body, response_body_length,
             duration_ms, created_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT (event_id) DO NOTHING
         `, [
           eventId, itemSessionId, itemRitm, resolvedAppId, req.pentester.id, req.pentester.username, machineName,
           tool, timestamp, method, url, host, port, path, query,
@@ -770,34 +799,34 @@ router.get('/logs', authenticateLeader, async (req, res) => {
   try {
     const { ritm, tool, tester, method, status_code, search, limit = 50, offset = 0 } = req.query;
 
-    let query = 'SELECT id, event_id, ritm, application_id, tester_username, tool, timestamp, method, url, host, path, status_code, duration_ms, request_body_length, response_body_length FROM traffic_logs WHERE 1=1';
-    const params = [];
+    const where = ['1=1'];
+    const filterParams = [];
 
-    if (ritm) { query += ' AND ritm = ?'; params.push(String(ritm).trim().toUpperCase()); }
-    if (tool) { query += ' AND tool = ?'; params.push(String(tool).trim().toUpperCase()); }
-    if (tester) { query += ' AND tester_username = ?'; params.push(String(tester).trim()); }
-    if (method) { query += ' AND method = ?'; params.push(String(method).trim().toUpperCase()); }
-    if (status_code) { query += ' AND status_code = ?'; params.push(parseInt(status_code, 10)); }
-    if (search) { query += ' AND (url LIKE ? OR path LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
+    if (ritm) { where.push('ritm = ?'); filterParams.push(String(ritm).trim().toUpperCase()); }
+    if (tool) { where.push('tool = ?'); filterParams.push(String(tool).trim().toUpperCase()); }
+    if (tester) { where.push('tester_username = ?'); filterParams.push(String(tester).trim()); }
+    if (method) { where.push('method = ?'); filterParams.push(String(method).trim().toUpperCase()); }
+    if (status_code) { where.push('status_code = ?'); filterParams.push(parseInt(status_code, 10)); }
+    if (search) { where.push('(url LIKE ? OR path LIKE ?)'); filterParams.push(`%${search}%`, `%${search}%`); }
 
-    query += ' ORDER BY timestamp DESC LIMIT ? OFFSET ?';
-    params.push(Math.min(parseInt(limit, 10) || 50, 200), parseInt(offset, 10) || 0);
+    const whereClause = where.join(' AND ');
+    const safeLimit = Math.min(Math.max(1, parseInt(limit, 10) || 50), 200);
+    const safeOffset = Math.max(0, parseInt(offset, 10) || 0);
 
-    const rows = await db.all(query, params);
+    const query = `
+      SELECT id, event_id, ritm, application_id, tester_username, tool, timestamp, method, url, host, path, status_code, duration_ms, request_body_length, response_body_length 
+      FROM traffic_logs 
+      WHERE ${whereClause} 
+      ORDER BY timestamp DESC 
+      LIMIT ? OFFSET ?
+    `;
+    const rows = await db.all(query, [...filterParams, safeLimit, safeOffset]);
 
-    let countQuery = 'SELECT COUNT(*) AS total FROM traffic_logs WHERE 1=1';
-    const countParams = params.slice(0, params.length - 2);
-    if (ritm) countQuery += ' AND ritm = ?';
-    if (tool) countQuery += ' AND tool = ?';
-    if (tester) countQuery += ' AND tester_username = ?';
-    if (method) countQuery += ' AND method = ?';
-    if (status_code) countQuery += ' AND status_code = ?';
-    if (search) countQuery += ' AND (url LIKE ? OR path LIKE ?)';
-
-    const totalRow = await db.get(countQuery, countParams);
+    const countQuery = `SELECT COUNT(*) AS total FROM traffic_logs WHERE ${whereClause}`;
+    const totalRow = await db.get(countQuery, filterParams);
     const totalCount = totalRow ? parseInt(totalRow.total, 10) : 0;
 
-    res.json({ total: totalCount, limit: parseInt(limit, 10) || 50, offset: parseInt(offset, 10) || 0, logs: rows });
+    res.json({ total: totalCount, limit: safeLimit, offset: safeOffset, logs: rows });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -22,12 +22,31 @@ import java.util.UUID;
 
 public class SwatcherHttpHandler implements HttpHandler {
 
+    private static final int MAX_BODY_CHARS = 65_536; // 64KB max capture to protect JVM heap
     private final MontoyaApi api;
     private final SwatcherTab tab;
 
     public SwatcherHttpHandler(MontoyaApi api, SwatcherTab tab) {
         this.api = api;
         this.tab = tab;
+    }
+
+    private String safeTruncateBody(String body) {
+        if (body == null) return "";
+        if (body.length() <= MAX_BODY_CHARS) {
+            return body;
+        }
+        return body.substring(0, MAX_BODY_CHARS) + "\n[swatcher: payload truncated at 64KB - original size: " + body.length() + " chars]";
+    }
+
+    private Map<String, String> extractHeaders(java.util.List<HttpHeader> headers) {
+        Map<String, String> map = new HashMap<>();
+        if (headers == null) return map;
+        for (HttpHeader h : headers) {
+            if (h.name() == null) continue;
+            map.merge(h.name(), h.value() != null ? h.value() : "", (oldVal, newVal) -> oldVal + "; " + newVal);
+        }
+        return map;
     }
 
     @Override
@@ -86,26 +105,24 @@ public class SwatcherHttpHandler implements HttpHandler {
                 event.request.url = req.url();
                 event.request.host = req.httpService().host();
                 event.request.port = req.httpService().port();
-                event.request.path = req.path();
-                event.request.query = req.path().contains("?") ? req.path().substring(req.path().indexOf("?") + 1) : "";
-
-                Map<String, String> reqHeaders = new HashMap<>();
-                for (HttpHeader h : req.headers()) {
-                    reqHeaders.put(h.name(), h.value());
+                String path = req.path() != null ? req.path() : "/";
+                String query = "";
+                int qIdx = path.indexOf("?");
+                if (qIdx != -1 && qIdx + 1 < path.length()) {
+                    query = path.substring(qIdx + 1);
                 }
-                event.request.headers = reqHeaders;
-                event.request.body = req.bodyToString();
+
+                event.request.path = path;
+                event.request.query = query;
+                event.request.headers = extractHeaders(req.headers());
+                event.request.body = safeTruncateBody(req.bodyToString());
                 event.request.body_length = req.body().length();
 
                 // Response details
                 event.response = new TrafficEvent.ResponseInfo();
                 event.response.status_code = res.statusCode();
-                Map<String, String> resHeaders = new HashMap<>();
-                for (HttpHeader h : res.headers()) {
-                    resHeaders.put(h.name(), h.value());
-                }
-                event.response.headers = resHeaders;
-                event.response.body = res.bodyToString();
+                event.response.headers = extractHeaders(res.headers());
+                event.response.body = safeTruncateBody(res.bodyToString());
                 event.response.body_length = res.body().length();
                 event.response.duration_ms = 0;
 

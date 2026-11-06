@@ -192,16 +192,20 @@ public class SessionManager {
                 checkAndAutoStartSession();
                 return true;
             } else {
-                // Allow offline activation if key is present
-                isTokenVerified = true;
-                authenticatedFullName = "Local Pentester";
-                authenticatedUsername = "tester";
-                notifyAuthListeners(true, authenticatedFullName, authenticatedUsername, "Server unreachable (Operating offline)");
-                checkAndAutoStartSession();
-                return true;
+                // Key has not been verified with central server yet
+                notifyAuthListeners(false, "", "", "Server unreachable. Key will be validated when server reconnects.");
+                return false;
             }
         }
         return isTokenVerified;
+    }
+
+    public synchronized void markTokenRejected(String reason) {
+        this.isTokenVerified = false;
+        if (api != null) {
+            try { api.persistence().preferences().setBoolean("swatcher.isTokenVerified", false); } catch (Exception ignored) {}
+        }
+        notifyAuthListeners(false, "", "", reason != null ? reason : "API Key rejected by server.");
     }
 
     /**
@@ -227,9 +231,8 @@ public class SessionManager {
         this.ritm = ritm.trim().toUpperCase();
         this.applicationId = applicationId.trim().toUpperCase();
         this.allocatedHours = effortHours > 0 ? effortHours : 40.0;
-        if (this.currentSessionId == null || this.currentSessionId.isEmpty()) {
-            this.currentSessionId = "sess_" + this.ritm + "_" + System.currentTimeMillis();
-        }
+        // Always generate a fresh session ID on engagement start or project update
+        this.currentSessionId = "sess_" + this.ritm + "_" + System.currentTimeMillis();
         this.recordingEnabled.set(true);
 
         // Persist to current Burp project file

@@ -41,8 +41,11 @@ public class OfflineQueueManager {
         long lines = 0;
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(
                 new FileInputStream(queueFile), StandardCharsets.UTF_8))) {
-            while (reader.readLine() != null) {
-                lines++;
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (!line.trim().isEmpty()) {
+                    lines++;
+                }
             }
         } catch (Exception e) {
             lines = 0;
@@ -117,6 +120,9 @@ public class OfflineQueueManager {
                 String line;
                 int skipped = 0;
                 while ((line = reader.readLine()) != null) {
+                    if (line.trim().isEmpty()) {
+                        continue; // Discard blank lines
+                    }
                     if (skipped < count) {
                         skipped++;
                     } else {

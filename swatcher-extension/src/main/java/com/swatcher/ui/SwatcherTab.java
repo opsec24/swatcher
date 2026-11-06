@@ -285,6 +285,7 @@ public class SwatcherTab extends JPanel {
     private void updateStatusLabel() {
         boolean recording = SessionManager.getInstance().isRecordingEnabled();
         boolean online = TrafficDispatcher.getInstance().isServerOnline();
+        boolean authOk = TrafficDispatcher.getInstance().isAuthValid();
         long offline = TrafficDispatcher.getInstance().getOfflineCount();
         String ritm = SessionManager.getInstance().getRitm();
         String appId = SessionManager.getInstance().getApplicationId();
@@ -295,6 +296,12 @@ public class SwatcherTab extends JPanel {
             toggleBtn.setText("Start Recording Session");
             toggleBtn.setBackground(new Color(34, 197, 94)); // Green
             toggleBtn.setForeground(Color.BLACK);
+        } else if (!authOk) {
+            statusLabel.setText("STATUS: AUTH REJECTED - Invalid API Token");
+            statusLabel.setForeground(new Color(239, 68, 68)); // Red
+            toggleBtn.setText("Pause Recording");
+            toggleBtn.setBackground(new Color(239, 68, 68)); // Red
+            toggleBtn.setForeground(Color.WHITE);
         } else if (!online || offline > 0) {
             String countNote = offline > 0 ? " (" + offline + " queued locally)" : "";
             statusLabel.setText("STATUS: SAVING OFFLINE - Server Offline" + countNote);

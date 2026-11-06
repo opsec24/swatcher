@@ -3,6 +3,8 @@ const { promisify } = require('node:util');
 const db = require('../db');
 
 const scryptAsync = promisify(crypto.scrypt);
+// Constant dummy salt to neutralize username enumeration timing attacks
+const DUMMY_SALT = '0123456789abcdef0123456789abcdef';
 
 function validatePasswordComplexity(password) {
   if (!password || typeof password !== 'string') {
@@ -20,8 +22,8 @@ function validatePasswordComplexity(password) {
   if (!/[0-9]/.test(password)) {
     return { isValid: false, reason: 'Password must include at least one number (0-9)' };
   }
-  if (!/[!@#$%^&*(),.?":{}|<>\-_]/.test(password)) {
-    return { isValid: false, reason: 'Password must include at least one special character (!@#$%^&*)' };
+  if (!/[!@#$%^&*(),.?":{}|<>\-_+=\[\]~`\/\\;]/.test(password)) {
+    return { isValid: false, reason: 'Password must include at least one special character (!@#$%^&* etc.)' };
   }
   return { isValid: true };
 }
@@ -70,6 +72,8 @@ async function verifyLeadershipUser(username, password) {
   const user = await db.get('SELECT * FROM leadership_users WHERE username = ?', [cleanUsername]);
 
   if (!user) {
+    // Perform dummy scrypt operation to equalize execution time and prevent username enumeration
+    await hashPassword(password || 'dummy_password', DUMMY_SALT);
     return { user: null, reason: 'INVALID_CREDENTIALS', message: 'Invalid username or password.' };
   }
 
@@ -177,7 +181,7 @@ async function validateSession(token) {
     SELECT s.*, u.full_name, u.email, u.role
     FROM leadership_sessions s
     JOIN leadership_users u ON s.user_id = u.id
-    WHERE s.id = ? AND s.ended_at IS NULL AND u.is_active = 1
+    WHERE s.id = ? AND s.ended_at IS NULL AND u.is_active = 1 AND u.is_locked = 0
   `, [token]);
 
   if (!session) return null;
