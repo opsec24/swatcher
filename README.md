@@ -8,7 +8,7 @@
 4. **Append-Only Multi-Tester Collaboration:** Multiple pentesters can work on the same `RITM` simultaneously without overwriting data.
 5. **Zero-Friction Project Persistence:** Details saved directly into the Burp `.burp` project file. Open an existing project and it **auto-resumes recording silently**!
 6. **Enterprise Token Security:** Ingestion requests authenticate with cryptographically random API tokens (`Bearer sw_live_...`). Pentester identity is derived server-side to prevent header spoofing.
-7. **Production Grade:** Supports **PostgreSQL 16** with connection pooling and embedded SQLite fallback.
+7. **Production Grade:** Built on **PostgreSQL 16** with enterprise connection pooling, persistent storage volumes, and high-throughput indexes.
 
 ---
 
@@ -160,39 +160,35 @@ To serve the dashboard and API over HTTPS on standard port 443 with an SSL certi
 
 ## 💻 Cross-Platform Quick Start (Windows, Kali Linux, macOS)
 
-You can run `swatcher` either in enterprise **Docker mode (PostgreSQL 16)** or in lightweight **Standalone Local Mode (Node.js + Embedded SQLite)** on any operating system:
+`swatcher` is powered by **PostgreSQL 16** and deploys seamlessly via Docker Compose across all platforms:
 
 ### Windows (PowerShell or CMD)
 ```cmd
-# Double click or run in CMD:
+# Double-click or run in Command Prompt:
 run.bat
 
 # Or run in PowerShell:
 .\run.ps1
-
-# To force standalone Node.js local mode (no Docker):
-run.bat --local
 ```
 
 ### Kali Linux, Debian, Ubuntu & macOS
 ```bash
 chmod +x run.sh
-
-# Enterprise Docker Compose Mode (installs Docker if needed & boots PostgreSQL):
 ./run.sh
-
-# Standalone Local Mode (Node.js + SQLite, zero Docker required):
-./run.sh --local
 ```
 
-### Pure npm (Any OS from Repository Root)
+### Local Development (with Local PostgreSQL)
+If you already run a local PostgreSQL service on your machine:
 ```bash
-# 1. Install dependencies
+# 1. Provide your local PostgreSQL credentials (or in .env)
+export DATABASE_URL="postgres://swatcher:swatcher_password@localhost:5432/swatcher_db"
+
+# 2. Install dependencies
 npm run install:server
 
-# 2. Seed realistic demo data (optional)
+# 3. Seed realistic demo data (optional)
 npm run seed
 
-# 3. Start swatcher server on port 9090
+# 4. Start swatcher on port 9090
 npm start
 ```

@@ -2,6 +2,7 @@
 # ==============================================================================
 # swatcher - Enterprise Deployment and Runner Script
 # Targeted for: Kali Linux, Ubuntu, Debian, Amazon Linux, RHEL, Fedora, macOS
+# Database Engine: PostgreSQL 16 (Enterprise Persistent Volume)
 # ==============================================================================
 
 set -e
@@ -27,7 +28,7 @@ print_banner() {
   echo "  ╚════██║██║███╗██║██╔══██║   ██║   ██║     ██╔══██║██╔══╝  ██╔══██╗"
   echo "  ███████║╚███╔███╔╝██║  ██║   ██║   ╚██████╗██║  ██║███████╗██║  ██║"
   echo "  ╚══════╝ ╚══╝╚══╝ ╚═╝  ╚═╝   ╚═╝    ╚═════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝"
-  echo -e "         Enterprise Traffic Governance & Audit Platform${NC}"
+  echo -e "       Enterprise Traffic Governance & Audit Platform (PostgreSQL 16)${NC}"
   echo ""
 }
 
@@ -36,48 +37,6 @@ SUDO_CMD="sudo"
 if [ "$(id -u)" -eq 0 ] || ! command -v sudo >/dev/null 2>&1; then
   SUDO_CMD=""
 fi
-
-# Standalone Local Mode (Node.js + Embedded SQLite)
-run_local() {
-  print_banner
-  echo -e "${GREEN}--> Launching in Standalone Local Mode (Node.js + Embedded SQLite)...${NC}"
-  
-  if ! command -v node >/dev/null 2>&1; then
-    echo -e "${RED}[✘] Node.js is not installed!${NC}"
-    echo -e "${YELLOW}Please install Node.js (v18, v20, or v22) to run locally:${NC}"
-    echo -e "  - Kali / Debian / Ubuntu: ${CYAN}${SUDO_CMD} apt-get update && ${SUDO_CMD} apt-get install -y nodejs npm${NC}"
-    echo -e "  - macOS:                  ${CYAN}brew install node${NC}"
-    echo -e "  - Windows:                Download from https://nodejs.org"
-    exit 1
-  fi
-
-  echo -e "  ${GREEN}[✔] Node.js found:${NC} $(node --version)"
-  if command -v npm >/dev/null 2>&1; then
-    echo -e "  ${GREEN}[✔] npm found:${NC}     $(npm --version)"
-  fi
-
-  echo -e "\n${BLUE}--> Verifying dependencies in swatcher-server...${NC}"
-  cd "$SCRIPT_DIR/swatcher-server"
-  if [ ! -d "node_modules" ]; then
-    echo -e "  ${YELLOW}[*] Installing server packages (first-time setup)...${NC}"
-    npm install
-  fi
-
-  echo ""
-  echo -e "${GREEN}==============================================================================${NC}"
-  echo -e "${BOLD}${GREEN}               swatcher IS LIVE (STANDALONE LOCAL MODE)                      ${NC}"
-  echo -e "${GREEN}==============================================================================${NC}"
-  echo ""
-  echo -e "  ${BOLD}Leadership Web Dashboard:${NC}  ${CYAN}http://localhost:9090/${NC}"
-  echo -e "  ${BOLD}Burp Ingestion Endpoint:${NC}   ${CYAN}http://localhost:9090/api/v1/ingest/batch${NC}"
-  echo -e "  ${BOLD}Database Engine:${NC}           Embedded SQLite (${SCRIPT_DIR}/swatcher-server/data/swatcher.db)"
-  echo ""
-  echo -e "${BOLD}USEFUL HINT:${NC}"
-  echo -e "  To run with enterprise PostgreSQL in Docker later, run: ${CYAN}./run.sh${NC}"
-  echo -e "${GREEN}==============================================================================${NC}\n"
-
-  exec npm start
-}
 
 # ------------------------------------------------------------------------------
 # Subcommand Handlers
@@ -99,9 +58,6 @@ if ! $COMPOSE_CMD version >/dev/null 2>&1; then
 fi
 
 case "$1" in
-  --local|-local)
-    run_local
-    ;;
   --logs|-l)
     print_banner
     echo -e "${BLUE}--> Streaming live logs for swatcher containers... (Ctrl+C to exit)${NC}"
@@ -118,7 +74,7 @@ case "$1" in
     print_banner
     echo -e "${YELLOW}--> Stopping all swatcher services...${NC}"
     $COMPOSE_CMD down
-    echo -e "${GREEN}[✔] Services stopped safely.${NC}"
+    echo -e "${GREEN}[✔] Services stopped safely. Data persists in postgres volume.${NC}"
     exit 0
     ;;
   --restart)
@@ -134,7 +90,6 @@ case "$1" in
     echo ""
     echo "Options:"
     echo "  (no args)    Build and launch enterprise swatcher via Docker Compose (PostgreSQL 16)"
-    echo "  --local      Launch standalone local mode via Node.js + Embedded SQLite (no Docker needed)"
     echo "  --logs, -l   View streaming container logs"
     echo "  --status, -s Check running status and health of containers"
     echo "  --restart    Restart application containers"
@@ -190,9 +145,12 @@ else
     fi
     DOCKER_CMD="$SUDO_CMD docker"
   else
-    echo -e "  ${YELLOW}[!] Automatic Docker installation not applicable for $OS_ID.${NC}"
-    echo -e "  ${BLUE}--> Seamlessly falling back to Standalone Local Mode (Node.js + SQLite)...${NC}"
-    run_local
+    echo -e "${RED}[✘] Could not automatically install Docker on $OS_ID.${NC}"
+    echo -e "${YELLOW}swatcher requires PostgreSQL 16 via Docker. Please install Docker manually:${NC}"
+    echo -e "  - Kali / Debian: ${CYAN}${SUDO_CMD} apt-get install -y docker.io docker-compose-plugin${NC}"
+    echo -e "  - Arch:          ${CYAN}${SUDO_CMD} pacman -S docker docker-compose${NC}"
+    echo -e "  - macOS:         ${CYAN}brew install --cask docker${NC}"
+    exit 1
   fi
 fi
 
@@ -204,9 +162,9 @@ if ! $DOCKER_CMD info >/dev/null 2>&1; then
 fi
 
 if ! $DOCKER_CMD info >/dev/null 2>&1; then
-  echo -e "  ${YELLOW}[!] Docker daemon could not be reached.${NC}"
-  echo -e "  ${BLUE}--> Seamlessly switching to Standalone Local Mode (Node.js + Embedded SQLite)...${NC}\n"
-  run_local
+  echo -e "${RED}[✘] Docker daemon is not active.${NC}"
+  echo -e "${YELLOW}Please start Docker daemon via: ${CYAN}${SUDO_CMD} systemctl start docker${NC}"
+  exit 1
 fi
 
 # Check Docker Compose (v2 plugin or standalone)
@@ -234,9 +192,9 @@ if ! $DOCKER_CMD compose version >/dev/null 2>&1; then
 fi
 
 if ! $COMPOSE_CMD version >/dev/null 2>&1; then
-  echo -e "  ${YELLOW}[!] Docker Compose is unavailable.${NC}"
-  echo -e "  ${BLUE}--> Switching to Standalone Local Mode (Node.js + Embedded SQLite)...${NC}\n"
-  run_local
+  echo -e "${RED}[✘] Docker Compose is unavailable.${NC}"
+  echo -e "${YELLOW}Please install docker-compose or the docker-compose-plugin package.${NC}"
+  exit 1
 fi
 
 echo -e "  ${GREEN}[✔] Docker Compose is ready:${NC} $($COMPOSE_CMD version)"
@@ -244,17 +202,17 @@ echo -e "  ${GREEN}[✔] Docker Compose is ready:${NC} $($COMPOSE_CMD version)"
 # ------------------------------------------------------------------------------
 # STEP 2: Configure Environment & Cryptographic Secrets
 # ------------------------------------------------------------------------------
-echo -e "\n${BOLD}[2/5] Initializing application secrets and configuration...${NC}"
+echo -e "\n${BOLD}[2/5] Initializing PostgreSQL credentials and secrets...${NC}"
 
 if [ ! -f .env ]; then
-  echo -e "  ${YELLOW}[!] No .env file detected. Generating production secrets...${NC}"
+  echo -e "  ${YELLOW}[!] No .env file detected. Generating secure PostgreSQL secrets...${NC}"
   
   RANDOM_DB_PASS=$(openssl rand -hex 20 2>/dev/null || date +%s | sha256sum | head -c 40 || echo "swatcher_secure_db_pass_12948")
   RANDOM_SESSION_SECRET=$(openssl rand -hex 32 2>/dev/null || date +%s | sha256sum | head -c 64 || echo "swatcher_session_secret_key_88412")
 
   cat <<EOF > .env
 # ==============================================================================
-# swatcher Production Environment Variables (Auto-generated)
+# swatcher Production Environment Variables (PostgreSQL 16)
 # Generated: $(date -u +"%Y-%m-%d %H:%M:%SZ")
 # ==============================================================================
 
@@ -271,7 +229,7 @@ DB_SSL=false
 EOF
 
   chmod 600 .env 2>/dev/null || true
-  echo -e "  ${GREEN}[✔] Created .env with secure random passwords.${NC}"
+  echo -e "  ${GREEN}[✔] Created .env with secure random PostgreSQL passwords.${NC}"
 else
   echo -e "  ${GREEN}[✔] Existing .env file found. Preserving current secrets.${NC}"
 fi
@@ -287,7 +245,7 @@ $COMPOSE_CMD up -d --build
 # ------------------------------------------------------------------------------
 # STEP 4: Await Service Health
 # ------------------------------------------------------------------------------
-echo -e "\n${BOLD}[4/5] Waiting for database initialization and application healthcheck...${NC}"
+echo -e "\n${BOLD}[4/5] Waiting for PostgreSQL initialization and application healthcheck...${NC}"
 
 RETRIES=30
 HEALTHY=false

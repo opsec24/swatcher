@@ -25,7 +25,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'UP',
     service: 'swatcher-server',
-    db_type: db.isPostgres ? 'postgresql' : 'sqlite',
+    db_type: 'postgresql',
     version: '1.0.0',
     timestamp: new Date().toISOString()
   });
@@ -44,7 +44,7 @@ async function startServer() {
     const server = app.listen(PORT, HOST, () => {
       console.log(`=======================================================`);
       console.log(`  swatcher Central Server listening on ${HOST}:${PORT}`);
-      console.log(`  Database Engine:      ${db.isPostgres ? 'Enterprise PostgreSQL' : 'Embedded SQLite'}`);
+      console.log(`  Database Engine:      Enterprise PostgreSQL 16`);
       console.log(`  Leadership Dashboard: http://localhost:${PORT}`);
       console.log(`  Ingestion Endpoint:   http://localhost:${PORT}/api/v1/ingest/batch`);
       console.log(`=======================================================`);
