@@ -1,0 +1,15 @@
+{
+  "name": "swatcher-server",
+  "version": "1.0.0",
+  "description": "Central Ingestion API & Leadership Dashboard for swatcher Burp traffic monitoring",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "seed": "node src/seed.js"
+  },
+  "dependencies": {
+    "compression": "^1.7.5",
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  }
+}
