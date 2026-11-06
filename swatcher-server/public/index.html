@@ -647,6 +647,62 @@
     </div>
   </div>
 
+  <!-- API KEY GENERATED MODAL -->
+  <div id="key-generated-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+          <i class="fa-solid fa-key text-[#0f766e] dark:text-teal-400"></i>
+          <span>Pentester API Key Generated</span>
+        </h3>
+        <button onclick="closeKeyGeneratedModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-lg">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <div class="p-3 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-900/80 flex items-center space-x-3">
+          <div class="w-8 h-8 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
+            <i class="fa-solid fa-check"></i>
+          </div>
+          <div>
+            <div class="text-xs font-bold text-slate-900 dark:text-white" id="modal-key-tester-name">Pentester Name</div>
+            <div class="text-[11px] text-teal-700 dark:text-teal-300">Profile registered successfully. Copy and share the live token below.</div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Live Ingestion API Token</label>
+          <div class="flex items-center space-x-2">
+            <input type="text" readonly id="modal-generated-key-input" class="w-full px-3 py-2 text-xs font-bold mono bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white select-all focus:outline-none">
+            <button onclick="copyGeneratedKeyModal()" class="px-3.5 py-2 rounded-lg bg-[#0f766e] hover:bg-[#115e59] text-white text-xs font-bold transition flex items-center space-x-1.5 flex-shrink-0 shadow-sm">
+              <i class="fa-regular fa-copy"></i>
+              <span id="modal-copy-btn-text">Copy Key</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px] text-slate-600 dark:text-slate-400 space-y-1">
+          <div class="font-bold text-slate-800 dark:text-slate-200 flex items-center space-x-1.5">
+            <i class="fa-solid fa-circle-info text-[#0f766e] dark:text-teal-400"></i>
+            <span>Burp Suite Handshake Instructions:</span>
+          </div>
+          <div class="text-slate-500 dark:text-slate-400">1. Install <span class="mono font-semibold text-slate-800 dark:text-slate-200">swatcher-1.0.0.jar</span> in Burp Extensions.</div>
+          <div class="text-slate-500 dark:text-slate-400">2. Paste this API Key into the Swatcher extension setup modal to authenticate.</div>
+        </div>
+      </div>
+
+      <div class="pt-2 flex justify-end">
+        <button onclick="closeKeyGeneratedModal()" class="px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition">
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FLOATING TOAST NOTIFICATION CONTAINER -->
+  <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
   <!-- PAYLOAD INSPECTION MODAL -->
   <div id="payload-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm">
     <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl">
@@ -711,6 +767,102 @@
     let logsOffset = 0;
     const logsLimit = 25;
     let searchDebounceTimer = null;
+
+    // ==========================================
+    // UTILITIES & SECURITY HELPERS
+    // ==========================================
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // Modern toast notification system (replaces ugly browser alert)
+    function showToast(message, isError = false) {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const toast = document.createElement('div');
+      toast.className = `pointer-events-auto flex items-center space-x-2 px-4 py-2.5 rounded-xl shadow-xl text-xs font-semibold tracking-tight transition-all duration-300 transform translate-y-2 opacity-0 ${
+        isError 
+          ? 'bg-rose-900/95 text-rose-100 border border-rose-700/60 backdrop-blur-md' 
+          : 'bg-slate-900/95 dark:bg-slate-800/95 text-white border border-slate-700/60 backdrop-blur-md'
+      }`;
+      toast.innerHTML = `
+        <i class="${isError ? 'fa-solid fa-circle-exclamation text-rose-400' : 'fa-solid fa-circle-check text-emerald-400'}"></i>
+        <span>${escapeHtml(message)}</span>
+      `;
+      container.appendChild(toast);
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 2600);
+    }
+
+    // Robust cross-context clipboard copy (works on HTTP, raw IPs, localhost, HTTPS)
+    function copyToClipboard(text, msg = 'API Key copied to clipboard!') {
+      if (!text) return;
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text)
+          .then(() => showToast(msg))
+          .catch(() => fallbackCopy(text, msg));
+      } else {
+        fallbackCopy(text, msg);
+      }
+    }
+
+    function fallbackCopy(text, msg) {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      textArea.style.top = '-999999px';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+          showToast(msg);
+        } else {
+          showToast('Failed to copy', true);
+        }
+      } catch (err) {
+        console.error('Fallback copy error:', err);
+        showToast('Failed to copy', true);
+      }
+      document.body.removeChild(textArea);
+    }
+
+    // Pentester API Key Modal Controls
+    function openKeyGeneratedModal(name, key) {
+      document.getElementById('modal-key-tester-name').innerText = name;
+      document.getElementById('modal-generated-key-input').value = key;
+      document.getElementById('modal-copy-btn-text').innerText = 'Copy Key';
+      document.getElementById('key-generated-modal').classList.remove('hidden');
+      // Auto-copy immediately for convenience
+      copyToClipboard(key, 'API Key copied to clipboard!');
+    }
+
+    function closeKeyGeneratedModal() {
+      document.getElementById('key-generated-modal').classList.add('hidden');
+    }
+
+    function copyGeneratedKeyModal() {
+      const key = document.getElementById('modal-generated-key-input').value;
+      copyToClipboard(key, 'API Key copied to clipboard!');
+      document.getElementById('modal-copy-btn-text').innerText = 'Copied!';
+      setTimeout(() => {
+        const btn = document.getElementById('modal-copy-btn-text');
+        if (btn) btn.innerText = 'Copy Key';
+      }, 2000);
+    }
 
     // Theme Management (Defaults to Enterprise Light Mode)
     function initTheme() {
@@ -1088,7 +1240,7 @@
         else if (e.progress_status === 'ON_TARGET') barColor = 'bg-emerald-600';
 
         const testerBadges = e.testers.length > 0
-          ? e.testers.map(t => `<span class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-[10px] mono font-medium"><i class="fa-solid fa-user-shield mr-1 text-[#0f766e] dark:text-teal-400"></i>${t}</span>`).join(' ')
+          ? e.testers.map(t => `<span class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-[10px] mono font-medium"><i class="fa-solid fa-user-shield mr-1 text-[#0f766e] dark:text-teal-400"></i>${escapeHtml(t)}</span>`).join(' ')
           : '<span class="text-slate-400 italic">None yet</span>';
 
         tr.onclick = (evt) => {
@@ -1099,20 +1251,20 @@
 
         tr.innerHTML = `
           <td class="p-3">
-            <input type="checkbox" onchange="toggleSelectRitm('${e.ritm}', this.checked)" class="ritm-checkbox rounded border-slate-300 text-[#0f766e] focus:ring-teal-500" ${selectedRitms.has(e.ritm) ? 'checked' : ''}>
+            <input type="checkbox" onchange="toggleSelectRitm('${escapeHtml(e.ritm)}', this.checked)" class="ritm-checkbox rounded border-slate-300 text-[#0f766e] focus:ring-teal-500" ${selectedRitms.has(e.ritm) ? 'checked' : ''}>
           </td>
           <td class="p-3">
-            <span class="px-2.5 py-1 rounded-md bg-teal-50 dark:bg-teal-950 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800 font-bold mono text-xs">${e.application_id}</span>
+            <span class="px-2.5 py-1 rounded-md bg-teal-50 dark:bg-teal-950 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800 font-bold mono text-xs">${escapeHtml(e.application_id)}</span>
           </td>
-          <td class="p-3 mono font-bold text-slate-900 dark:text-white text-xs">${e.ritm}</td>
+          <td class="p-3 mono font-bold text-slate-900 dark:text-white text-xs">${escapeHtml(e.ritm)}</td>
           <td class="p-3">
             <div class="flex flex-wrap gap-1">${testerBadges}</div>
           </td>
           <td class="p-3">
             <div class="space-y-1">
               <div class="flex items-center justify-between text-[11px]">
-                <span class="text-slate-700 dark:text-slate-300 font-semibold">${e.active_hours}h / ${e.allocated_hours}h</span>
-                <span class="text-purple-600 dark:text-purple-400 font-bold mono">${e.pending_hours}h pending</span>
+                <span class="text-slate-700 dark:text-slate-300 font-semibold">${Number(e.active_hours)}h / ${Number(e.allocated_hours)}h</span>
+                <span class="text-purple-600 dark:text-purple-400 font-bold mono">${Number(e.pending_hours)}h pending</span>
               </div>
               <div class="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-200 dark:border-slate-700">
                 <div class="${barColor} h-full rounded-full transition-all duration-300" style="width: ${Math.min(100, e.completion_percentage)}%"></div>
@@ -1120,13 +1272,13 @@
             </div>
           </td>
           <td class="p-3">
-            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${e.status === 'ACTIVE' ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'}">${e.status}</span>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${e.status === 'ACTIVE' ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'}">${escapeHtml(e.status)}</span>
           </td>
           <td class="p-3 text-right space-x-1">
-            <button onclick="openEngagementDetail('${e.ritm}')" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-[11px] font-bold" title="Deep Dive View">
+            <button onclick="openEngagementDetail('${escapeHtml(e.ritm)}')" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-[11px] font-bold" title="Deep Dive View">
               Inspect
             </button>
-            <button onclick="deleteSingleRitm('${e.ritm}')" class="p-1 px-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950 text-rose-600 dark:text-rose-400 border border-slate-200 dark:border-slate-700 transition" title="Delete Engagement">
+            <button onclick="deleteSingleRitm('${escapeHtml(e.ritm)}')" class="p-1 px-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950 text-rose-600 dark:text-rose-400 border border-slate-200 dark:border-slate-700 transition" title="Delete Engagement">
               <i class="fa-solid fa-trash-can text-xs"></i>
             </button>
           </td>
@@ -1235,12 +1387,12 @@
             row.className = 'p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between';
             row.innerHTML = `
               <div class="flex items-center space-x-2">
-                <span class="w-6 h-6 rounded-full bg-teal-100 dark:bg-teal-900 text-teal-800 dark:text-teal-300 flex items-center justify-center font-bold text-[10px]">${t.username.charAt(0).toUpperCase()}</span>
-                <span class="mono font-semibold text-slate-800 dark:text-slate-200">${t.username}</span>
+                <span class="w-6 h-6 rounded-full bg-teal-100 dark:bg-teal-900 text-teal-800 dark:text-teal-300 flex items-center justify-center font-bold text-[10px]">${escapeHtml(t.username.charAt(0).toUpperCase())}</span>
+                <span class="mono font-semibold text-slate-800 dark:text-slate-200">${escapeHtml(t.username)}</span>
               </div>
               <div class="flex items-center space-x-3 mono">
-                <span class="text-emerald-600 dark:text-emerald-400 font-bold">${t.active_hours}h</span>
-                <span class="text-slate-500">${t.request_count} reqs</span>
+                <span class="text-emerald-600 dark:text-emerald-400 font-bold">${Number(t.active_hours)}h</span>
+                <span class="text-slate-500">${Number(t.request_count)} reqs</span>
               </div>
             `;
             testersContainer.appendChild(row);
@@ -1258,8 +1410,8 @@
           const row = document.createElement('div');
           row.className = 'flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700';
           row.innerHTML = `
-            <span class="mono font-bold text-slate-700 dark:text-slate-300">${tool.tool}</span>
-            <span class="mono font-semibold text-[#0f766e] dark:text-teal-400">${tool.count} reqs (${Math.round((tool.count / (totalReqs || 1)) * 100)}%)</span>
+            <span class="mono font-bold text-slate-700 dark:text-slate-300">${escapeHtml(tool.tool)}</span>
+            <span class="mono font-semibold text-[#0f766e] dark:text-teal-400">${Number(tool.count)} reqs (${Math.round((tool.count / (totalReqs || 1)) * 100)}%)</span>
           `;
           toolsContainer.appendChild(row);
         });
@@ -1271,11 +1423,11 @@
           const tr = document.createElement('tr');
           tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-700 dark:text-slate-300';
           tr.innerHTML = `
-            <td class="p-2 font-bold text-[#0f766e] dark:text-teal-400">${ep.method}</td>
-            <td class="p-2 text-slate-500">${ep.host}</td>
-            <td class="p-2 text-slate-800 dark:text-slate-200 truncate max-w-xs">${ep.path}</td>
-            <td class="p-2 font-bold ${ep.status_code < 400 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}">${ep.status_code}</td>
-            <td class="p-2 font-medium">${ep.hits}</td>
+            <td class="p-2 font-bold text-[#0f766e] dark:text-teal-400">${escapeHtml(ep.method)}</td>
+            <td class="p-2 text-slate-500">${escapeHtml(ep.host)}</td>
+            <td class="p-2 text-slate-800 dark:text-slate-200 truncate max-w-xs">${escapeHtml(ep.path)}</td>
+            <td class="p-2 font-bold ${ep.status_code < 400 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}">${parseInt(ep.status_code, 10)}</td>
+            <td class="p-2 font-medium">${parseInt(ep.hits, 10)}</td>
             <td class="p-2 text-slate-400 text-[10px]">${new Date(ep.last_hit).toLocaleTimeString()}</td>
           `;
           epTbody.appendChild(tr);
@@ -1317,37 +1469,37 @@
 
           tr.innerHTML = `
             <td class="p-3.5">
-              <input type="checkbox" onchange="toggleSelectTester('${t.id}', this.checked)" class="tester-checkbox rounded border-slate-300 text-[#0f766e] focus:ring-teal-500" ${selectedTesters.has(t.id) ? 'checked' : ''}>
+              <input type="checkbox" onchange="toggleSelectTester('${escapeHtml(t.id)}', this.checked)" class="tester-checkbox rounded border-slate-300 text-[#0f766e] focus:ring-teal-500" ${selectedTesters.has(t.id) ? 'checked' : ''}>
             </td>
             <td class="p-3.5 font-bold text-slate-900 dark:text-white flex items-center space-x-2">
               <div class="w-6 h-6 rounded-full bg-teal-100 dark:bg-teal-900/60 text-teal-800 dark:text-teal-300 flex items-center justify-center font-bold text-[10px]">
-                ${t.full_name.charAt(0).toUpperCase()}
+                ${escapeHtml(t.full_name.charAt(0).toUpperCase())}
               </div>
-              <span class="font-extrabold">${t.full_name}</span>
+              <span class="font-extrabold">${escapeHtml(t.full_name)}</span>
             </td>
             <td class="p-3.5 mono">
-              <div class="text-slate-800 dark:text-slate-200 font-semibold">${t.username}</div>
-              <div class="text-[11px] text-slate-500">${t.email || ''}</div>
+              <div class="text-slate-800 dark:text-slate-200 font-semibold">${escapeHtml(t.username)}</div>
+              <div class="text-[11px] text-slate-500">${escapeHtml(t.email || '')}</div>
             </td>
             <td class="p-3.5">
               <div class="flex items-center space-x-1.5">
-                <input type="password" value="${t.api_key}" readonly id="key-${t.id}" class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-[11px] mono text-slate-700 dark:text-slate-300 w-36 select-all focus:outline-none">
-                <button onclick="toggleKeyVisibility('${t.id}')" class="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white" title="Toggle Visibility">
+                <input type="password" value="${escapeHtml(t.api_key)}" readonly id="key-${escapeHtml(t.id)}" class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-[11px] mono text-slate-700 dark:text-slate-300 w-36 select-all focus:outline-none">
+                <button onclick="toggleKeyVisibility('${escapeHtml(t.id)}')" class="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white" title="Toggle Visibility">
                   <i class="fa-solid fa-eye text-xs"></i>
                 </button>
-                <button onclick="copyToClipboard('${t.api_key}', 'API Key copied!')" class="p-1 px-2.5 rounded-md bg-teal-50 dark:bg-teal-950 hover:bg-teal-100 dark:hover:bg-teal-900 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800 text-[10px] font-bold">
+                <button onclick="copyToClipboard('${escapeHtml(t.api_key)}', 'API Key copied!')" class="p-1 px-2.5 rounded-md bg-teal-50 dark:bg-teal-950 hover:bg-teal-100 dark:hover:bg-teal-900 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800 text-[10px] font-bold">
                   <i class="fa-regular fa-copy mr-1"></i> Copy
                 </button>
               </div>
             </td>
             <td class="p-3.5">${statusBadge}</td>
-            <td class="p-3.5 mono text-slate-800 dark:text-slate-200 font-semibold">${t.total_engagements}</td>
-            <td class="p-3.5 mono text-slate-500">${Number(t.total_requests).toLocaleString()}</td>
+            <td class="p-3.5 mono text-slate-800 dark:text-slate-200 font-semibold">${parseInt(t.total_engagements, 10) || 0}</td>
+            <td class="p-3.5 mono text-slate-500">${Number(t.total_requests || 0).toLocaleString()}</td>
             <td class="p-3.5 text-right space-x-1">
-              <button onclick="togglePentesterStatus('${t.id}')" class="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[10px] font-bold">
+              <button onclick="togglePentesterStatus('${escapeHtml(t.id)}')" class="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[10px] font-bold">
                 ${t.is_active ? 'Revoke' : 'Activate'}
               </button>
-              <button onclick="deleteSingleTester('${t.id}', '${t.username}')" class="p-1 px-2 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950 text-rose-600 dark:text-rose-400 border border-slate-200 dark:border-slate-700" title="Delete Pentester">
+              <button onclick="deleteSingleTester('${escapeHtml(t.id)}', '${escapeHtml(t.username)}')" class="p-1 px-2 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950 text-rose-600 dark:text-rose-400 border border-slate-200 dark:border-slate-700" title="Delete Pentester">
                 <i class="fa-solid fa-trash-can text-xs"></i>
               </button>
             </td>
@@ -1393,10 +1545,11 @@
       if (!confirm(`Delete pentester profile for '${username}' and revoke their API access?\nThis action will be recorded in the audit trail.`)) return;
       try {
         const res = await fetch(`/api/v1/pentesters/${id}`, { method: 'DELETE', headers: authHeaders() });
-        if (!res.ok) { const err = await res.json(); alert('Error: ' + err.error); return; }
+        if (!res.ok) { const err = await res.json(); showToast('Error: ' + err.error, true); return; }
+        showToast(`Pentester '${username}' removed`);
         fetchPentesters();
       } catch (err) {
-        alert('Failed to delete tester: ' + err.message);
+        showToast('Failed to delete tester: ' + err.message, true);
       }
     }
 
@@ -1409,22 +1562,18 @@
           headers: authHeaders(),
           body: JSON.stringify({ ids: Array.from(selectedTesters) })
         });
-        if (!res.ok) { const err = await res.json(); alert('Error: ' + err.error); return; }
+        if (!res.ok) { const err = await res.json(); showToast('Error: ' + err.error, true); return; }
         selectedTesters.clear();
+        showToast('Selected pentesters deleted');
         fetchPentesters();
       } catch (err) {
-        alert('Batch delete failed: ' + err.message);
+        showToast('Batch delete failed: ' + err.message, true);
       }
     }
 
     function toggleKeyVisibility(id) {
       const input = document.getElementById(`key-${id}`);
       input.type = input.type === 'password' ? 'text' : 'password';
-    }
-
-    function copyToClipboard(text, msg) {
-      navigator.clipboard.writeText(text);
-      alert(msg || 'Copied!');
     }
 
     async function togglePentesterStatus(id) {
@@ -1440,7 +1589,7 @@
       const username = document.getElementById('new-tester-username').value.trim();
       const email = document.getElementById('new-tester-email').value.trim();
 
-      if (!name || !username) { alert('Full name and username are required.'); return; }
+      if (!name || !username) { showToast('Full name and username are required.', true); return; }
 
       try {
         const res = await fetch('/api/v1/pentesters', {
@@ -1449,13 +1598,18 @@
           body: JSON.stringify({ full_name: name, username, email })
         });
         const data = await res.json();
-        if (!res.ok) { alert('Error: ' + data.error); return; }
+        if (!res.ok) { showToast('Error: ' + data.error, true); return; }
 
         closeAddTesterModal();
-        alert(`Pentester profile created!\nAPI Key for ${name}:\n\n${data.pentester.api_key}\n\nCopy and share this token with the tester.`);
+        document.getElementById('new-tester-name').value = '';
+        document.getElementById('new-tester-username').value = '';
+        document.getElementById('new-tester-email').value = '';
+
+        // Open sleek modal without ugly alert()
+        openKeyGeneratedModal(name, data.pentester.api_key);
         fetchPentesters();
       } catch (err) {
-        alert('Failed: ' + err.message);
+        showToast('Failed: ' + err.message, true);
       }
     }
 
@@ -1489,12 +1643,12 @@
 
           tr.innerHTML = `
             <td class="p-3 mono text-slate-500 whitespace-nowrap">${new Date(l.created_at).toLocaleString()}</td>
-            <td class="p-3 mono font-bold text-slate-900 dark:text-white">${l.username}</td>
-            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${actionBadge} mono">${l.action_type}</span></td>
-            <td class="p-3 mono text-[#0f766e] dark:text-teal-400 font-bold">${l.target_id || l.target_name || '-'}</td>
-            <td class="p-3 text-slate-600 dark:text-slate-300 max-w-sm">${l.description}</td>
-            <td class="p-3 mono text-slate-500">${durationStr}</td>
-            <td class="p-3 mono text-slate-400">${l.ip_address}</td>
+            <td class="p-3 mono font-bold text-slate-900 dark:text-white">${escapeHtml(l.username)}</td>
+            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${actionBadge} mono">${escapeHtml(l.action_type)}</span></td>
+            <td class="p-3 mono text-[#0f766e] dark:text-teal-400 font-bold">${escapeHtml(l.target_id || l.target_name || '-')}</td>
+            <td class="p-3 text-slate-600 dark:text-slate-300 max-w-sm">${escapeHtml(l.description)}</td>
+            <td class="p-3 mono text-slate-500">${escapeHtml(durationStr)}</td>
+            <td class="p-3 mono text-slate-400">${escapeHtml(l.ip_address)}</td>
           `;
           tbody.appendChild(tr);
         });
@@ -1523,12 +1677,16 @@
           body: JSON.stringify({ full_name, username, email, password })
         });
         const data = await res.json();
-        if (!res.ok) { alert('Error: ' + data.error); return; }
+        if (!res.ok) { showToast('Error: ' + data.error, true); return; }
 
         closeCreateUserModal();
-        alert(`Leadership user '${username}' created successfully!`);
+        document.getElementById('new-user-fullname').value = '';
+        document.getElementById('new-user-username').value = '';
+        document.getElementById('new-user-email').value = '';
+        document.getElementById('new-user-password').value = '';
+        showToast(`Administrator '${username}' created successfully!`);
       } catch (err) {
-        alert('Failed to create user: ' + err.message);
+        showToast('Failed to create user: ' + err.message, true);
       }
     }
 
@@ -1573,15 +1731,15 @@
 
           tr.innerHTML = `
             <td class="p-3 text-slate-500 mono text-[11px] whitespace-nowrap">${new Date(log.timestamp).toLocaleTimeString()}</td>
-            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-semibold border mono bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700">${log.tool}</span></td>
-            <td class="p-3 mono font-medium text-slate-800 dark:text-slate-200">${log.ritm}</td>
-            <td class="p-3 mono text-slate-500">${log.tester_username}</td>
-            <td class="p-3 mono font-bold text-[#0f766e] dark:text-teal-400">${log.method}</td>
-            <td class="p-3 mono text-slate-800 dark:text-slate-200 truncate max-w-xs" title="${log.url}">${log.path || '/'}</td>
-            <td class="p-3 mono font-bold ${log.status_code < 400 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}">${log.status_code}</td>
-            <td class="p-3 mono text-slate-500">${log.duration_ms}ms</td>
+            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-semibold border mono bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700">${escapeHtml(log.tool)}</span></td>
+            <td class="p-3 mono font-medium text-slate-800 dark:text-slate-200">${escapeHtml(log.ritm)}</td>
+            <td class="p-3 mono text-slate-500">${escapeHtml(log.tester_username)}</td>
+            <td class="p-3 mono font-bold text-[#0f766e] dark:text-teal-400">${escapeHtml(log.method)}</td>
+            <td class="p-3 mono text-slate-800 dark:text-slate-200 truncate max-w-xs" title="${escapeHtml(log.url)}">${escapeHtml(log.path || '/')}</td>
+            <td class="p-3 mono font-bold ${log.status_code < 400 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}">${parseInt(log.status_code, 10) || 0}</td>
+            <td class="p-3 mono text-slate-500">${parseInt(log.duration_ms, 10) || 0}ms</td>
             <td class="p-3 text-right">
-              <button onclick="openLogDetail(${log.id})" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-[11px] font-bold">Inspect</button>
+              <button onclick="openLogDetail(${parseInt(log.id, 10)})" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-[11px] font-bold">Inspect</button>
             </td>
           `;
           tbody.appendChild(tr);

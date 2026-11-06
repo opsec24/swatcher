@@ -1,5 +1,6 @@
 const express = require('express');
 const crypto = require('node:crypto');
+const rateLimit = require('express-rate-limit');
 const db = require('../db');
 const {
   validatePasswordComplexity,
@@ -14,6 +15,31 @@ const {
 const { getOverview, getEngagementMetrics, getEngagementDetail } = require('../services/analytics');
 
 const router = express.Router();
+
+// Rate limiters for authentication endpoints
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts from this IP. Please try again in 15 minutes.' }
+});
+
+const verifyKeyLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many key verification requests. Please slow down.' }
+});
+
+const setupLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many setup attempts from this IP.' }
+});
 
 function getClientIp(req) {
   return req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
@@ -100,7 +126,7 @@ router.get('/auth/status', async (req, res) => {
   }
 });
 
-router.post('/auth/verify-key', async (req, res) => {
+router.post('/auth/verify-key', verifyKeyLimiter, async (req, res) => {
   try {
     const authHeader = req.headers.authorization || '';
     let token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : authHeader.trim();
@@ -140,7 +166,7 @@ router.post('/auth/verify-key', async (req, res) => {
   }
 });
 
-router.post('/auth/setup', async (req, res) => {
+router.post('/auth/setup', setupLimiter, async (req, res) => {
   try {
     const hasUsers = await hasAnyLeadershipUsers();
     if (hasUsers) {
@@ -177,7 +203,7 @@ router.post('/auth/setup', async (req, res) => {
   }
 });
 
-router.post('/auth/login', async (req, res) => {
+router.post('/auth/login', loginLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
     const ip = getClientIp(req);

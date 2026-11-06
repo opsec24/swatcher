@@ -1,5 +1,8 @@
 const crypto = require('node:crypto');
+const { promisify } = require('node:util');
 const db = require('../db');
+
+const scryptAsync = promisify(crypto.scrypt);
 
 function validatePasswordComplexity(password) {
   if (!password || typeof password !== 'string') {
@@ -23,8 +26,10 @@ function validatePasswordComplexity(password) {
   return { isValid: true };
 }
 
-function hashPassword(password, salt) {
-  return crypto.scryptSync(password, salt, 64).toString('hex');
+// Asynchronous scrypt prevents event-loop starvation and DoS under concurrent login load
+async function hashPassword(password, salt) {
+  const derivedKey = await scryptAsync(password, salt, 64);
+  return derivedKey.toString('hex');
 }
 
 async function hasAnyLeadershipUsers() {
@@ -48,7 +53,7 @@ async function createLeadershipUser(username, fullName, email, password) {
   }
 
   const salt = crypto.randomBytes(16).toString('hex');
-  const hash = hashPassword(password, salt);
+  const hash = await hashPassword(password, salt);
   const id = `usr_leader_${crypto.randomUUID().slice(0, 8)}`;
   const now = new Date().toISOString();
 
@@ -68,7 +73,7 @@ async function verifyLeadershipUser(username, password) {
     return null;
   }
 
-  const computedHash = hashPassword(password, user.password_salt);
+  const computedHash = await hashPassword(password, user.password_salt);
   const a = Buffer.from(computedHash, 'hex');
   const b = Buffer.from(user.password_hash, 'hex');
 
@@ -100,6 +105,10 @@ async function createSession(userId, username, ip, userAgent) {
   return sessionId;
 }
 
+// 2-hour idle timeout & 24-hour absolute session expiration
+const MAX_IDLE_SECONDS = 2 * 60 * 60;
+const MAX_SESSION_SECONDS = 24 * 60 * 60;
+
 async function validateSession(token) {
   if (!token) return null;
 
@@ -114,13 +123,22 @@ async function validateSession(token) {
 
   const now = new Date();
   const createdTime = new Date(session.created_at);
-  const durationSeconds = Math.max(0, Math.floor((now.getTime() - createdTime.getTime()) / 1000));
+  const lastActiveTime = new Date(session.last_activity_at || session.created_at);
+
+  const idleSeconds = Math.max(0, Math.floor((now.getTime() - lastActiveTime.getTime()) / 1000));
+  const totalDuration = Math.max(0, Math.floor((now.getTime() - createdTime.getTime()) / 1000));
+
+  // Invalidate expired sessions automatically
+  if (idleSeconds > MAX_IDLE_SECONDS || totalDuration > MAX_SESSION_SECONDS) {
+    await endSession(token);
+    return null;
+  }
 
   await db.run(`
     UPDATE leadership_sessions 
     SET last_activity_at = ?, duration_seconds = ?
     WHERE id = ?
-  `, [now.toISOString(), durationSeconds, token]);
+  `, [now.toISOString(), totalDuration, token]);
 
   return {
     sessionId: session.id,
@@ -129,7 +147,7 @@ async function validateSession(token) {
     fullName: session.full_name,
     email: session.email,
     role: session.role,
-    durationSeconds
+    durationSeconds: totalDuration
   };
 }
 
@@ -146,6 +164,13 @@ async function endSession(token) {
   }
 }
 
+function sanitizeLogText(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/[<>]/g, '')
+    .slice(0, 500);
+}
+
 async function recordAuditLog({ sessionId, userId, username, actionType, targetId, targetName, description, details, ip }) {
   const now = new Date().toISOString();
   const detailsStr = details ? JSON.stringify(details) : null;
@@ -156,13 +181,13 @@ async function recordAuditLog({ sessionId, userId, username, actionType, targetI
   `, [
     sessionId || '',
     userId || 'SYSTEM',
-    username || 'SYSTEM',
-    actionType,
-    targetId || '',
-    targetName || '',
-    description,
+    sanitizeLogText(username || 'SYSTEM'),
+    sanitizeLogText(actionType),
+    sanitizeLogText(targetId || ''),
+    sanitizeLogText(targetName || ''),
+    sanitizeLogText(description),
     detailsStr,
-    ip || '',
+    sanitizeLogText(ip || ''),
     now
   ]);
 }

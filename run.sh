@@ -271,25 +271,8 @@ else
 fi
 
 # ------------------------------------------------------------------------------
-# STEP 5: Detect Host IP and Display Ready Banner
+# STEP 5: Display Ready Banner
 # ------------------------------------------------------------------------------
-echo -e "\n${BOLD}[5/5] Resolving network endpoints...${NC}"
-
-PUBLIC_IP=""
-IMDS_TOKEN=$(curl -s -f -m 2 -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60" 2>/dev/null || true)
-if [ -n "$IMDS_TOKEN" ]; then
-  PUBLIC_IP=$(curl -s -f -m 2 -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || true)
-fi
-
-if [ -z "$PUBLIC_IP" ]; then
-  PUBLIC_IP=$(curl -s -f -m 2 http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || true)
-fi
-
-if [ -z "$PUBLIC_IP" ]; then
-  PUBLIC_IP=$(curl -s -f -m 2 https://checkip.amazonaws.com 2>/dev/null || curl -s -f -m 2 https://ifconfig.me 2>/dev/null || echo "localhost")
-  PUBLIC_IP=$(echo "$PUBLIC_IP" | tr -d '[:space:]')
-fi
-
 APP_PORT=$(grep -E '^PORT=' .env 2>/dev/null | cut -d '=' -f2 | tr -d '[:space:]' || echo "9090")
 if [ -z "$APP_PORT" ]; then APP_PORT="9090"; fi
 
@@ -298,9 +281,9 @@ echo -e "${GREEN}===============================================================
 echo -e "${BOLD}${GREEN}               swatcher IS LIVE AND OPERATIONAL!                             ${NC}"
 echo -e "${GREEN}==============================================================================${NC}"
 echo ""
-echo -e "  ${BOLD}Leadership Web Dashboard:${NC}  ${CYAN}http://${PUBLIC_IP}:${APP_PORT}/${NC}"
-echo -e "  ${BOLD}Burp Ingestion Endpoint:${NC}   ${CYAN}http://${PUBLIC_IP}:${APP_PORT}/api/v1/ingest/batch${NC}"
-echo -e "  ${BOLD}Key Verification API:${NC}      ${CYAN}http://${PUBLIC_IP}:${APP_PORT}/api/v1/auth/verify-key${NC}"
+echo -e "  ${BOLD}Leadership Web Dashboard:${NC}  ${CYAN}http://0.0.0.0:${APP_PORT}/${NC}  (or http://localhost:${APP_PORT}/)"
+echo -e "  ${BOLD}Burp Ingestion Endpoint:${NC}   ${CYAN}http://0.0.0.0:${APP_PORT}/api/v1/ingest/batch${NC}"
+echo -e "  ${BOLD}Key Verification API:${NC}      ${CYAN}http://0.0.0.0:${APP_PORT}/api/v1/auth/verify-key${NC}"
 echo -e "  ${BOLD}Database Engine:${NC}           PostgreSQL 16 (Enterprise Persistent Volume)"
 echo ""
 echo -e "${BOLD}FIRST-TIME INITIALIZATION STEPS:${NC}"

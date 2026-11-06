@@ -60,9 +60,10 @@ async function getOverview() {
     FROM traffic_logs
   `)) || {};
 
-  const allRows = await db.all('SELECT timestamp FROM traffic_logs ORDER BY timestamp ASC');
-  const manualRows = await db.all("SELECT timestamp FROM traffic_logs WHERE tool IN ('REPEATER', 'PROXY') ORDER BY timestamp ASC");
-  const autoRows = await db.all("SELECT timestamp FROM traffic_logs WHERE tool IN ('SCANNER', 'INTRUDER') ORDER BY timestamp ASC");
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const allRows = await db.all('SELECT timestamp FROM traffic_logs WHERE timestamp >= ? ORDER BY timestamp ASC', [thirtyDaysAgo]);
+  const manualRows = await db.all("SELECT timestamp FROM traffic_logs WHERE tool IN ('REPEATER', 'PROXY') AND timestamp >= ? ORDER BY timestamp ASC", [thirtyDaysAgo]);
+  const autoRows = await db.all("SELECT timestamp FROM traffic_logs WHERE tool IN ('SCANNER', 'INTRUDER') AND timestamp >= ? ORDER BY timestamp ASC", [thirtyDaysAgo]);
 
   const totalActiveMinutes = calculateActiveMinutes(allRows.map(r => r.timestamp));
   const manualActiveMinutes = calculateActiveMinutes(manualRows.map(r => r.timestamp));
