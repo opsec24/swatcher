@@ -7,6 +7,7 @@ const apiRoutes = require('./routes/api');
 
 const app = express();
 const PORT = process.env.PORT || 9090;
+const HOST = process.env.HOST || '0.0.0.0';
 
 app.use(cors());
 app.use(compression());
@@ -40,9 +41,9 @@ async function startServer() {
     // Ensure all database tables and indexes are created before accepting requests
     await db.initSchema();
 
-    const server = app.listen(PORT, () => {
+    const server = app.listen(PORT, HOST, () => {
       console.log(`=======================================================`);
-      console.log(`  swatcher Central Server listening on port ${PORT}`);
+      console.log(`  swatcher Central Server listening on ${HOST}:${PORT}`);
       console.log(`  Database Engine:      ${db.isPostgres ? 'Enterprise PostgreSQL' : 'Embedded SQLite'}`);
       console.log(`  Leadership Dashboard: http://localhost:${PORT}`);
       console.log(`  Ingestion Endpoint:   http://localhost:${PORT}/api/v1/ingest/batch`);
