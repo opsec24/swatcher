@@ -7,6 +7,7 @@ const {
   hasAnyLeadershipUsers,
   createLeadershipUser,
   verifyLeadershipUser,
+  unlockLeadershipUser,
   createSession,
   validateSession,
   endSession,
@@ -208,17 +209,18 @@ router.post('/auth/login', loginLimiter, async (req, res) => {
     const { username, password } = req.body;
     const ip = getClientIp(req);
 
-    const user = await verifyLeadershipUser(username, password);
-    if (!user) {
+    const result = await verifyLeadershipUser(username, password);
+    if (!result.user) {
       await recordAuditLog({
-        actionType: 'FAILED_LOGIN_ATTEMPT',
+        actionType: result.reason === 'ACCOUNT_LOCKED' ? 'ACCOUNT_LOCKED' : 'FAILED_LOGIN_ATTEMPT',
         username: username || 'UNKNOWN',
-        description: `Failed login attempt for username '${username}'`,
+        description: result.message || `Failed login attempt for username '${username}'`,
         ip
       });
-      return res.status(401).json({ error: 'Invalid username or password.' });
+      return res.status(401).json({ error: result.message || 'Invalid username or password.' });
     }
 
+    const user = result.user;
     const token = await createSession(user.id, user.username, ip, req.headers['user-agent']);
 
     await recordAuditLog({
@@ -286,10 +288,38 @@ router.post('/auth/users', authenticateLeader, async (req, res) => {
 
 router.get('/auth/users', authenticateLeader, async (req, res) => {
   try {
-    const users = await db.all('SELECT id, username, full_name, email, role, is_active, created_at, last_login_at FROM leadership_users ORDER BY created_at DESC');
+    const users = await db.all('SELECT id, username, full_name, email, role, is_active, is_locked, locked_at, failed_login_attempts, created_at, last_login_at FROM leadership_users ORDER BY created_at DESC');
     res.json(users);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Any authenticated leader can unlock a locked leadership account
+router.post('/auth/users/:id/unlock', authenticateLeader, async (req, res) => {
+  try {
+    const user = await unlockLeadershipUser(req.params.id);
+    const ip = getClientIp(req);
+
+    await recordAuditLog({
+      sessionId: req.leader.sessionId,
+      userId: req.leader.userId,
+      username: req.leader.username,
+      actionType: 'UNLOCK_USER',
+      targetId: user.id,
+      targetName: user.username,
+      description: `Administrator ${req.leader.username} unlocked account for ${user.username}`,
+      details: { unlocked_user: user.username, full_name: user.full_name },
+      ip
+    });
+
+    res.json({
+      status: 'OK',
+      message: `Account for '${user.username}' has been successfully unlocked.`,
+      user
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 

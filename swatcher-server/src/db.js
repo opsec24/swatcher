@@ -65,9 +65,17 @@ const db = {
         password_salt TEXT NOT NULL,
         role VARCHAR(32) DEFAULT 'LEADER',
         is_active INT DEFAULT 1,
+        failed_login_attempts INT DEFAULT 0,
+        is_locked INT DEFAULT 0,
+        locked_at VARCHAR(64),
         created_at VARCHAR(64) NOT NULL,
         last_login_at VARCHAR(64)
       );
+
+      -- Idempotent schema migration for account lockout
+      ALTER TABLE leadership_users ADD COLUMN IF NOT EXISTS failed_login_attempts INT DEFAULT 0;
+      ALTER TABLE leadership_users ADD COLUMN IF NOT EXISTS is_locked INT DEFAULT 0;
+      ALTER TABLE leadership_users ADD COLUMN IF NOT EXISTS locked_at VARCHAR(64);
 
       CREATE TABLE IF NOT EXISTS leadership_sessions (
         id VARCHAR(128) PRIMARY KEY,

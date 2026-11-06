@@ -69,8 +69,21 @@ async function verifyLeadershipUser(username, password) {
   const cleanUsername = String(username || '').trim().toLowerCase();
   const user = await db.get('SELECT * FROM leadership_users WHERE username = ?', [cleanUsername]);
 
-  if (!user || !user.is_active) {
-    return null;
+  if (!user) {
+    return { user: null, reason: 'INVALID_CREDENTIALS', message: 'Invalid username or password.' };
+  }
+
+  if (!user.is_active) {
+    return { user: null, reason: 'DEACTIVATED', message: 'Account is deactivated. Please contact an administrator.' };
+  }
+
+  // Account Lockout Check
+  if (user.is_locked) {
+    return {
+      user: null,
+      reason: 'ACCOUNT_LOCKED',
+      message: `Account '${user.username}' is locked due to multiple failed login attempts. Any active administrator can unlock it from the Admins menu.`
+    };
   }
 
   const computedHash = await hashPassword(password, user.password_salt);
@@ -78,18 +91,66 @@ async function verifyLeadershipUser(username, password) {
   const b = Buffer.from(user.password_hash, 'hex');
 
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-    return null;
+    const newFailures = (parseInt(user.failed_login_attempts, 10) || 0) + 1;
+    const MAX_FAILURES = 5;
+
+    if (newFailures >= MAX_FAILURES) {
+      const now = new Date().toISOString();
+      await db.run('UPDATE leadership_users SET failed_login_attempts = ?, is_locked = 1, locked_at = ? WHERE id = ?', [
+        newFailures, now, user.id
+      ]);
+      return {
+        user: null,
+        reason: 'ACCOUNT_LOCKED',
+        message: `Account '${user.username}' has been locked due to 5 consecutive failed login attempts. Any active administrator can unlock your account.`
+      };
+    } else {
+      await db.run('UPDATE leadership_users SET failed_login_attempts = ? WHERE id = ?', [
+        newFailures, user.id
+      ]);
+      const remaining = MAX_FAILURES - newFailures;
+      return {
+        user: null,
+        reason: 'INVALID_CREDENTIALS',
+        message: `Invalid username or password. (${remaining} attempt${remaining === 1 ? '' : 's'} remaining before lockout)`
+      };
+    }
   }
 
+  // Authentication succeeded: reset lockout state and update last login
   const now = new Date().toISOString();
-  await db.run('UPDATE leadership_users SET last_login_at = ? WHERE id = ?', [now, user.id]);
+  await db.run('UPDATE leadership_users SET last_login_at = ?, failed_login_attempts = 0, is_locked = 0, locked_at = NULL WHERE id = ?', [
+    now, user.id
+  ]);
+
+  return {
+    user: {
+      id: user.id,
+      username: user.username,
+      full_name: user.full_name,
+      email: user.email,
+      role: user.role
+    },
+    reason: null
+  };
+}
+
+async function unlockLeadershipUser(userId) {
+  const user = await db.get('SELECT * FROM leadership_users WHERE id = ?', [userId]);
+  if (!user) {
+    throw new Error('Leadership user not found.');
+  }
+
+  await db.run('UPDATE leadership_users SET is_locked = 0, failed_login_attempts = 0, locked_at = NULL WHERE id = ?', [
+    user.id
+  ]);
 
   return {
     id: user.id,
     username: user.username,
     full_name: user.full_name,
     email: user.email,
-    role: user.role
+    is_locked: false
   };
 }
 
@@ -198,6 +259,7 @@ module.exports = {
   hasAnyLeadershipUsers,
   createLeadershipUser,
   verifyLeadershipUser,
+  unlockLeadershipUser,
   createSession,
   validateSession,
   endSession,
