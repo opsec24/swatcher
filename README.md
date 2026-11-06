@@ -8,6 +8,7 @@
 4. **Append-Only Multi-Tester Collaboration:** Multiple pentesters can work on the same `RITM` simultaneously without overwriting data.
 5. **Zero-Friction Project Persistence:** Details saved directly into the Burp `.burp` project file. Open an existing project and it **auto-resumes recording silently**!
 6. **Enterprise Token Security:** Ingestion requests authenticate with cryptographically random API tokens (`Bearer sw_live_...`). Pentester identity is derived server-side to prevent header spoofing.
+7. **Production Grade:** Supports **PostgreSQL 16** with connection pooling and embedded SQLite fallback.
 
 ---
 
@@ -29,56 +30,141 @@
                                │ HTTPS / JSON Batch (Bearer Token)
                                ▼
   +-------------------------------------------------------------+
-  |                swatcher Central Server (:9090)              |
+  |              AWS EC2 Instance (Amazon Linux 2023)           |
   |                                                             |
-  |  [ Ingestion API ] ──► [ Token Validation & Ingestion DB ]  |
+  |  [Docker Compose]                                           |
+  |   ├── swatcher-app (:9090 Node 22 API & Leadership UI)      |
+  |   └── swatcher-db  (:5432 PostgreSQL 16 on EBS Volume)      |
   |                                                             |
   |              [ Leadership Operations Dashboard ]            |
-  |    - Effort Progress Bars (% Completed vs Allocated Hours)  |
+  |    - 4 Core KPI Cards (Pentesters, In-Progress, Hours MTD)  |
+  |    - Progress Bars (% Completed vs Allocated Hours)         |
   |    - Pentester Profile & Key Management (Generate & Copy)   |
-  |    - Multi-Tester Collaboration on Shared RITMs             |
-  |    - Traffic Log Explorer & Full Payload Inspection         |
+  |    - First-Time Admin Setup Wizard (Password Complexity)    |
+  |    - Full Audit Trail (Login Sessions, Activity Tracking)   |
   +-------------------------------------------------------------+
 ```
 
 ---
 
-## Key Enterprise Capabilities
+## 🚀 1-Click Production Deployment on AWS EC2 (Amazon Linux 2023 / AL2)
 
-### 1. Project Persistence (.burp File Scope)
-* **Global Preferences (`preferences()`):** Server URL (`http://localhost:9090`) and Pentester API Token are stored globally on the tester's machine. They only enter their token **once**.
-* **Project Scope (`extensionData()`):** The `RITM`, `Application ID`, `Allocated Effort`, and `Recording State` are stored directly inside the active `.burp` project file on disk.
-* **Auto-Resume:** Opening an existing saved `.burp` file automatically continues traffic recording with zero prompts.
-
-### 2. Multi-Tester Collaboration & RITM Rules
-* **Application Multi-Tenancy:** One `Application ID` (e.g. `APP-PAYMENTS-V2`) can host multiple `RITM`s over time (e.g., Q3 assessment, Q4 re-test).
-* **Append-Only Merging:** When Pentester B starts testing `RITM0049281` (already started by Pentester A), the server appends Pentester B's traffic to the same engagement without resetting hours or overwriting metadata.
-
-### 3. API Token Authentication (Anti-Spoofing)
-* No client username headers are trusted.
-* Each pentester is issued a unique token (`sw_live_...`) created in the Leadership Dashboard.
-* The server authenticates the token and binds the traffic to that pentester's profile.
+### Target Host Recommendation
+* **Instance Type:** `t3.xlarge` (4 vCPU, 16 GiB RAM)
+* **OS:** **Amazon Linux 2023 (AL2023)** (or Amazon Linux 2 / RHEL / Ubuntu)
+* **Storage:** 100 GB `gp3` EBS volume (for long-term traffic log retention)
+* **Inbound Security Group Rules:**
+  - Inbound TCP `9090` (or `443` if terminating SSL via Nginx / ALB) from internal leadership and pentester subnets.
+  - Inbound TCP `22` (SSH) restricted to admin bastion.
 
 ---
 
-## Quick Start
+### Step 1: Deploy with `./run.sh`
 
-### 1. Central Server & Leadership Dashboard
+SSH into your Amazon Linux EC2 instance, copy or clone this repository, and execute:
+
 ```bash
-cd swatcher-server
-npm install
-# Seed realistic demonstration team & traffic
-npm run seed
-# Start server on port 9090 (leaving 8080 free for Burp Proxy!)
-npm start
+chmod +x run.sh
+./run.sh
 ```
-Dashboard available at: **`http://localhost:9090`**
 
-### 2. Burp Extension Build & Install
+**What the automated runner script does:**
+1. Detects Amazon Linux (`dnf` on AL2023 / `yum` on AL2) and installs Docker and the Docker Compose v2 plugin if not already installed.
+2. Enables and starts the `docker` systemd service and adds the current user to the `docker` group.
+3. Automatically generates cryptographically secure passwords for PostgreSQL and the application session secret in `.env` (with `chmod 600` permissions).
+4. Launches the container stack (`postgres:16-alpine` + `swatcher-server` Node.js container) with optimized PostgreSQL memory buffers for `t3.xlarge` (2GB shared buffers, 6GB effective cache).
+5. Waits for health checks to pass and outputs your public endpoints!
+
+---
+
+### Step 2: Management Commands
+
+```bash
+# View live streaming application logs
+./run.sh --logs
+
+# Check container health and status
+./run.sh --status
+
+# Restart all services
+./run.sh --restart
+
+# Stop all containers safely (data persists in postgres volume)
+./run.sh --stop
+```
+
+---
+
+## First-Time Leadership Dashboard Setup
+
+1. Open your browser and navigate to:
+   ```
+   http://<EC2-PUBLIC-IP>:9090
+   ```
+2. Because the database is brand new, the **First-Time Setup Wizard** will prompt you to create the initial Leadership Admin account.
+3. Enter your details and set a strong master password (enforces min 10 characters, 1 uppercase, 1 lowercase, 1 number, and 1 special character).
+4. Once logged in, visit the **Pentesters Profile** tab to register your security team members.
+5. Click **Generate API Key** for each pentester and copy the token (`sw_live_...`) to securely distribute to them.
+
+---
+
+## Pentester Burp Extension Setup
+
+### 1. Build Fat JAR
 ```bash
 cd swatcher-extension
 ./gradlew jar
-# The fat JAR is generated at:
-# build/libs/swatcher-1.0.0.jar
+# Produces: swatcher-extension/build/libs/swatcher-1.0.0.jar
 ```
-Load into Burp Suite via **Extensions** -> **Installed** -> **Add** (Java).
+
+### 2. Install in Burp Suite
+1. In Burp Suite Pro, navigate to **Extensions** -> **Installed** -> **Add**.
+2. Select **Extension type: Java** and choose `swatcher-1.0.0.jar`.
+3. On first launch:
+   - Enter Central Server URL: `http://<EC2-PUBLIC-IP>:9090` (or your domain with HTTPS).
+   - Enter your assigned API Key: `sw_live_...`.
+   - The extension performs a cryptographic handshake with the server and displays:
+     ```
+     [swatcher] Welcome back, <Pentester Name>! Connection established.
+     ```
+4. The API key is stored **once** globally on the workstation in Burp preferences.
+
+### 3. Engagement Workflow
+* **New Project:** When opening a new Burp project file, the extension prompts for:
+  - **RITM Number** (e.g. `RITM0049281`)
+  - **Application ID** (e.g. `APP-PAYMENTS-V2`)
+  - **Allocated Hours** (e.g. `40`)
+* **Saved Project:** When opening an existing `.burp` file, swatcher **automatically restores all parameters and resumes recording silently**!
+
+---
+
+## Production Nginx Reverse Proxy (SSL / HTTPS)
+
+To serve the dashboard and API over HTTPS on standard port 443 with an SSL certificate:
+
+1. Copy the provided Nginx configuration:
+   ```bash
+   sudo cp nginx/swatcher.conf /etc/nginx/conf.d/swatcher.conf
+   ```
+2. Edit `/etc/nginx/conf.d/swatcher.conf` with your corporate domain or run Certbot:
+   ```bash
+   sudo certbot --nginx -d swatcher.yourcompany.internal
+   ```
+3. Reload Nginx:
+   ```bash
+   sudo systemctl reload nginx
+   ```
+*(The Nginx configuration already includes `client_max_body_size 50M;` to support large Burp batch traffic uploads).*
+
+---
+
+## Local Development (Without Docker)
+
+You can also run the server directly on your local machine using embedded SQLite:
+
+```bash
+cd swatcher-server
+npm install
+npm run seed     # Seeds realistic demo pentesters, engagements, and traffic
+npm start        # Runs on port 9090
+```

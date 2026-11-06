@@ -4,4 +4,7 @@ build/
 *.db
 *.db-wal
 *.db-shm
+swatcher-server/data/
 .DS_Store
+.env
+*.env

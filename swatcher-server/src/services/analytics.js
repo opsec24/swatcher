@@ -1,9 +1,5 @@
 const db = require('../db');
 
-/**
- * Calculates active testing minutes from an array of timestamps.
- * A 10-minute inactivity threshold is used to separate active bursts from idle gaps.
- */
 function calculateActiveMinutes(timestamps, maxGapMinutes = 10, defaultBlockMinutes = 1) {
   if (!timestamps || timestamps.length === 0) return 0;
   if (timestamps.length === 1) return defaultBlockMinutes;
@@ -39,33 +35,21 @@ function calculateActiveMinutes(timestamps, maxGapMinutes = 10, defaultBlockMinu
   return Math.round(totalActiveMs / (60 * 1000));
 }
 
-/**
- * Returns overall leadership metrics.
- */
-function getOverview() {
-  // 1. Current number of registered active pentesters
-  const pentestersCount = db.prepare(`
-    SELECT COUNT(*) AS count FROM pentesters WHERE is_active = 1
-  `).get().count;
+async function getOverview() {
+  const pentestersRow = await db.get('SELECT COUNT(*) AS count FROM pentesters WHERE is_active = 1');
+  const pentestersCount = pentestersRow ? parseInt(pentestersRow.count, 10) : 0;
 
-  // 2. Number of pentests currently in progress
-  const inProgressCount = db.prepare(`
-    SELECT COUNT(*) AS count FROM engagements WHERE status = 'ACTIVE'
-  `).get().count;
+  const inProgressRow = await db.get("SELECT COUNT(*) AS count FROM engagements WHERE status = 'ACTIVE'");
+  const inProgressCount = inProgressRow ? parseInt(inProgressRow.count, 10) : 0;
 
-  // 3. Total number of hours spent for CURRENT MONTH (across all pentests)
-  const currentMonthPrefix = new Date().toISOString().slice(0, 7); // e.g. "2026-11"
-  const currentMonthTimestamps = db.prepare(`
-    SELECT timestamp FROM traffic_logs
-    WHERE timestamp LIKE ?
-    ORDER BY timestamp ASC
-  `).all(`${currentMonthPrefix}%`).map(r => r.timestamp);
+  const currentMonthPrefix = new Date().toISOString().slice(0, 7);
+  const currentMonthRows = await db.all('SELECT timestamp FROM traffic_logs WHERE timestamp LIKE ? ORDER BY timestamp ASC', [`${currentMonthPrefix}%`]);
+  const currentMonthTimestamps = currentMonthRows.map(r => r.timestamp);
 
   const currentMonthActiveMins = calculateActiveMinutes(currentMonthTimestamps);
   const currentMonthHours = (currentMonthActiveMins / 60).toFixed(1);
 
-  // General traffic stats
-  const stats = db.prepare(`
+  const stats = (await db.get(`
     SELECT
       COUNT(*) AS total_requests,
       COUNT(DISTINCT tester_username) AS total_testers,
@@ -74,26 +58,24 @@ function getOverview() {
       COUNT(DISTINCT host || path) AS unique_endpoints,
       COALESCE(SUM(duration_ms), 0) AS total_duration_ms
     FROM traffic_logs
-  `).get();
+  `)) || {};
 
-  const allTimestamps = db.prepare('SELECT timestamp FROM traffic_logs ORDER BY timestamp ASC').all().map(r => r.timestamp);
-  const manualTimestamps = db.prepare("SELECT timestamp FROM traffic_logs WHERE tool IN ('REPEATER', 'PROXY') ORDER BY timestamp ASC").all().map(r => r.timestamp);
-  const automatedTimestamps = db.prepare("SELECT timestamp FROM traffic_logs WHERE tool IN ('SCANNER', 'INTRUDER') ORDER BY timestamp ASC").all().map(r => r.timestamp);
+  const allRows = await db.all('SELECT timestamp FROM traffic_logs ORDER BY timestamp ASC');
+  const manualRows = await db.all("SELECT timestamp FROM traffic_logs WHERE tool IN ('REPEATER', 'PROXY') ORDER BY timestamp ASC");
+  const autoRows = await db.all("SELECT timestamp FROM traffic_logs WHERE tool IN ('SCANNER', 'INTRUDER') ORDER BY timestamp ASC");
 
-  const totalActiveMinutes = calculateActiveMinutes(allTimestamps);
-  const manualActiveMinutes = calculateActiveMinutes(manualTimestamps);
-  const automatedActiveMinutes = calculateActiveMinutes(automatedTimestamps);
+  const totalActiveMinutes = calculateActiveMinutes(allRows.map(r => r.timestamp));
+  const manualActiveMinutes = calculateActiveMinutes(manualRows.map(r => r.timestamp));
+  const automatedActiveMinutes = calculateActiveMinutes(autoRows.map(r => r.timestamp));
 
-  // Tool distribution
-  const tools = db.prepare(`
+  const tools = await db.all(`
     SELECT tool, COUNT(*) AS count
     FROM traffic_logs
     GROUP BY tool
     ORDER BY count DESC
-  `).all();
+  `);
 
-  // Status code breakdown
-  const statusCodes = db.prepare(`
+  const statusCodes = await db.all(`
     SELECT 
       CASE 
         WHEN status_code >= 200 AND status_code < 300 THEN '2xx Success'
@@ -105,20 +87,13 @@ function getOverview() {
       COUNT(*) AS count
     FROM traffic_logs
     GROUP BY status_group
-  `).all();
+  `);
 
-  // 4. Calculate pending hours across all active engagements
-  const activeEngagements = db.prepare(`
-    SELECT ritm, allocated_hours FROM engagements WHERE status = 'ACTIVE'
-  `).all();
-
+  const activeEngagements = await db.all("SELECT ritm, allocated_hours FROM engagements WHERE status = 'ACTIVE'");
   let totalPendingMinutes = 0;
   for (const eng of activeEngagements) {
-    const engTimestamps = db.prepare(`
-      SELECT timestamp FROM traffic_logs WHERE ritm = ? ORDER BY timestamp ASC
-    `).all(eng.ritm).map(r => r.timestamp);
-
-    const activeMins = calculateActiveMinutes(engTimestamps);
+    const engRows = await db.all('SELECT timestamp FROM traffic_logs WHERE ritm = ? ORDER BY timestamp ASC', [eng.ritm]);
+    const activeMins = calculateActiveMinutes(engRows.map(r => r.timestamp));
     const allocatedMins = (eng.allocated_hours || 40) * 60;
     const pendingMins = Math.max(0, allocatedMins - activeMins);
     totalPendingMinutes += pendingMins;
@@ -127,17 +102,14 @@ function getOverview() {
 
   return {
     summary: {
-      // The 4 Core Leadership Cards:
-      current_pentesters: pentestersCount || 0,
-      pentests_in_progress: inProgressCount || 0,
+      current_pentesters: pentestersCount,
+      pentests_in_progress: inProgressCount,
       hours_current_month: currentMonthHours,
       total_pending_hours: totalPendingHours,
-
-      // Supporting Metrics
-      total_requests: stats.total_requests || 0,
-      total_engagements: stats.total_engagements || 0,
-      total_applications: stats.total_applications || 0,
-      unique_endpoints: stats.unique_endpoints || 0,
+      total_requests: parseInt(stats.total_requests || 0, 10),
+      total_engagements: parseInt(stats.total_engagements || 0, 10),
+      total_applications: parseInt(stats.total_applications || 0, 10),
+      unique_endpoints: parseInt(stats.unique_endpoints || 0, 10),
       total_active_hours: (totalActiveMinutes / 60).toFixed(1),
       manual_active_hours: (manualActiveMinutes / 60).toFixed(1),
       automated_active_hours: (automatedActiveMinutes / 60).toFixed(1)
@@ -147,47 +119,21 @@ function getOverview() {
   };
 }
 
-/**
- * Returns metrics per engagement (RITM) with Effort & Pending Hours.
- */
-function getEngagementMetrics() {
-  const engagements = db.prepare(`
-    SELECT 
-      id,
-      ritm,
-      application_id,
-      client_name,
-      allocated_hours,
-      status,
-      created_at
-    FROM engagements
-    ORDER BY created_at DESC
-  `).all();
+async function getEngagementMetrics() {
+  const engagements = await db.all('SELECT id, ritm, application_id, client_name, allocated_hours, status, created_at FROM engagements ORDER BY created_at DESC');
 
-  return engagements.map(eng => {
-    const timestamps = db.prepare(`
-      SELECT timestamp FROM traffic_logs
-      WHERE ritm = ?
-      ORDER BY timestamp ASC
-    `).all(eng.ritm).map(r => r.timestamp);
+  const results = [];
+  for (const eng of engagements) {
+    const rows = await db.all('SELECT timestamp, tool FROM traffic_logs WHERE ritm = ? ORDER BY timestamp ASC', [eng.ritm]);
+    const allTimestamps = rows.map(r => r.timestamp);
+    const manualTimestamps = rows.filter(r => r.tool === 'REPEATER' || r.tool === 'PROXY').map(r => r.timestamp);
+    const autoTimestamps = rows.filter(r => r.tool === 'SCANNER' || r.tool === 'INTRUDER').map(r => r.timestamp);
 
-    const manualTimestamps = db.prepare(`
-      SELECT timestamp FROM traffic_logs
-      WHERE ritm = ? AND tool IN ('REPEATER', 'PROXY')
-      ORDER BY timestamp ASC
-    `).all(eng.ritm).map(r => r.timestamp);
-
-    const automatedTimestamps = db.prepare(`
-      SELECT timestamp FROM traffic_logs
-      WHERE ritm = ? AND tool IN ('SCANNER', 'INTRUDER')
-      ORDER BY timestamp ASC
-    `).all(eng.ritm).map(r => r.timestamp);
-
-    const activeMins = calculateActiveMinutes(timestamps);
+    const activeMins = calculateActiveMinutes(allTimestamps);
     const manualMins = calculateActiveMinutes(manualTimestamps);
-    const autoMins = calculateActiveMinutes(automatedTimestamps);
+    const autoMins = calculateActiveMinutes(autoTimestamps);
 
-    const stats = db.prepare(`
+    const stats = (await db.get(`
       SELECT 
         COUNT(*) AS total_requests,
         COUNT(DISTINCT host || path) AS unique_endpoints,
@@ -195,11 +141,10 @@ function getEngagementMetrics() {
         MAX(timestamp) AS last_activity_at
       FROM traffic_logs
       WHERE ritm = ?
-    `).get(eng.ritm);
+    `, [eng.ritm])) || {};
 
-    const testers = db.prepare(`
-      SELECT DISTINCT tester_username FROM traffic_logs WHERE ritm = ?
-    `).all(eng.ritm).map(t => t.tester_username);
+    const testerRows = await db.all('SELECT DISTINCT tester_username FROM traffic_logs WHERE ritm = ?', [eng.ritm]);
+    const testers = testerRows.map(t => t.tester_username);
 
     const activeHours = Number((activeMins / 60).toFixed(1));
     const manualHours = Number((manualMins / 60).toFixed(1));
@@ -208,7 +153,6 @@ function getEngagementMetrics() {
     const pendingHours = Math.max(0, allocated - activeHours).toFixed(1);
 
     const completionPct = allocated > 0 ? Math.round((activeHours / allocated) * 100) : 0;
-
     let progressStatus = 'IN_PROGRESS';
     if (completionPct >= 100) {
       progressStatus = completionPct > 105 ? 'OVER_BUDGET' : 'ON_TARGET';
@@ -216,7 +160,7 @@ function getEngagementMetrics() {
       progressStatus = 'ON_TARGET';
     }
 
-    return {
+    results.push({
       id: eng.id,
       ritm: eng.ritm,
       application_id: eng.application_id,
@@ -229,25 +173,25 @@ function getEngagementMetrics() {
       completion_percentage: completionPct,
       progress_status: progressStatus,
       status: eng.status,
-      total_requests: stats.total_requests || 0,
+      total_requests: parseInt(stats.total_requests || 0, 10),
       testers,
-      unique_endpoints: stats.unique_endpoints || 0,
+      unique_endpoints: parseInt(stats.unique_endpoints || 0, 10),
       started_at: stats.started_at || eng.created_at,
       last_activity_at: stats.last_activity_at || eng.created_at
-    };
-  });
+    });
+  }
+
+  return results;
 }
 
-/**
- * Returns single engagement deep-dive detail.
- */
-function getEngagementDetail(ritm) {
-  const eng = db.prepare('SELECT * FROM engagements WHERE ritm = ?').get(ritm.toUpperCase());
+async function getEngagementDetail(ritm) {
+  const eng = await db.get('SELECT * FROM engagements WHERE ritm = ?', [ritm.toUpperCase()]);
   if (!eng) return null;
 
-  const timestamps = db.prepare('SELECT timestamp FROM traffic_logs WHERE ritm = ? ORDER BY timestamp ASC').all(eng.ritm).map(r => r.timestamp);
-  const manualTimestamps = db.prepare("SELECT timestamp FROM traffic_logs WHERE ritm = ? AND tool IN ('REPEATER', 'PROXY') ORDER BY timestamp ASC").all(eng.ritm).map(r => r.timestamp);
-  const autoTimestamps = db.prepare("SELECT timestamp FROM traffic_logs WHERE ritm = ? AND tool IN ('SCANNER', 'INTRUDER') ORDER BY timestamp ASC").all(eng.ritm).map(r => r.timestamp);
+  const rows = await db.all('SELECT timestamp, tool FROM traffic_logs WHERE ritm = ? ORDER BY timestamp ASC', [eng.ritm]);
+  const timestamps = rows.map(r => r.timestamp);
+  const manualTimestamps = rows.filter(r => r.tool === 'REPEATER' || r.tool === 'PROXY').map(r => r.timestamp);
+  const autoTimestamps = rows.filter(r => r.tool === 'SCANNER' || r.tool === 'INTRUDER').map(r => r.timestamp);
 
   const activeMins = calculateActiveMinutes(timestamps);
   const manualMins = calculateActiveMinutes(manualTimestamps);
@@ -258,38 +202,38 @@ function getEngagementDetail(ritm) {
   const pendingHours = Math.max(0, allocated - activeHours).toFixed(1);
   const completionPct = allocated > 0 ? Math.round((activeHours / allocated) * 100) : 0;
 
-  // Breakdown by tester on this engagement
-  const testerStats = db.prepare(`
+  const testerSummaryRows = await db.all(`
     SELECT tester_username, COUNT(*) as request_count, MIN(timestamp) as first_seen, MAX(timestamp) as last_seen
     FROM traffic_logs
     WHERE ritm = ?
     GROUP BY tester_username
-  `).all(eng.ritm).map(ts => {
-    const tTimes = db.prepare('SELECT timestamp FROM traffic_logs WHERE ritm = ? AND tester_username = ? ORDER BY timestamp ASC').all(eng.ritm, ts.tester_username).map(r => r.timestamp);
-    const tActiveMins = calculateActiveMinutes(tTimes);
-    return {
+  `, [eng.ritm]);
+
+  const testerStats = [];
+  for (const ts of testerSummaryRows) {
+    const tRows = await db.all('SELECT timestamp FROM traffic_logs WHERE ritm = ? AND tester_username = ? ORDER BY timestamp ASC', [eng.ritm, ts.tester_username]);
+    const tActiveMins = calculateActiveMinutes(tRows.map(r => r.timestamp));
+    testerStats.push({
       username: ts.tester_username,
-      request_count: ts.request_count,
+      request_count: parseInt(ts.request_count, 10),
       active_hours: (tActiveMins / 60).toFixed(1),
       first_seen: ts.first_seen,
       last_seen: ts.last_seen
-    };
-  });
+    });
+  }
 
-  // Unique endpoints on this engagement
-  const endpoints = db.prepare(`
+  const endpoints = await db.all(`
     SELECT method, host, path, status_code, COUNT(*) as hits, MAX(timestamp) as last_hit
     FROM traffic_logs
     WHERE ritm = ?
-    GROUP BY method, host, path
+    GROUP BY method, host, path, status_code
     ORDER BY hits DESC
     LIMIT 100
-  `).all(eng.ritm);
+  `, [eng.ritm]);
 
-  // Tools breakdown for this engagement
-  const tools = db.prepare(`
+  const tools = await db.all(`
     SELECT tool, COUNT(*) as count FROM traffic_logs WHERE ritm = ? GROUP BY tool
-  `).all(eng.ritm);
+  `, [eng.ritm]);
 
   return {
     engagement: {

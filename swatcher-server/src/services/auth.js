@@ -1,15 +1,6 @@
 const crypto = require('node:crypto');
 const db = require('../db');
 
-/**
- * Validates password complexity requirements.
- * Rules:
- * - Minimum 10 characters
- * - At least one uppercase letter (A-Z)
- * - At least one lowercase letter (a-z)
- * - At least one digit (0-9)
- * - At least one special character (!@#$%^&*...)
- */
 function validatePasswordComplexity(password) {
   if (!password || typeof password !== 'string') {
     return { isValid: false, reason: 'Password is required' };
@@ -36,12 +27,12 @@ function hashPassword(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString('hex');
 }
 
-function hasAnyLeadershipUsers() {
-  const count = db.prepare('SELECT COUNT(*) AS count FROM leadership_users').get().count;
-  return count > 0;
+async function hasAnyLeadershipUsers() {
+  const row = await db.get('SELECT COUNT(*) AS count FROM leadership_users');
+  return row ? parseInt(row.count, 10) > 0 : false;
 }
 
-function createLeadershipUser(username, fullName, email, password) {
+async function createLeadershipUser(username, fullName, email, password) {
   const complexity = validatePasswordComplexity(password);
   if (!complexity.isValid) {
     throw new Error(complexity.reason);
@@ -51,7 +42,7 @@ function createLeadershipUser(username, fullName, email, password) {
   const cleanName = String(fullName).trim();
   const cleanEmail = String(email || '').trim().toLowerCase();
 
-  const existing = db.prepare('SELECT id FROM leadership_users WHERE username = ?').get(cleanUsername);
+  const existing = await db.get('SELECT id FROM leadership_users WHERE username = ?', [cleanUsername]);
   if (existing) {
     throw new Error(`Username '${cleanUsername}' is already taken.`);
   }
@@ -61,17 +52,17 @@ function createLeadershipUser(username, fullName, email, password) {
   const id = `usr_leader_${crypto.randomUUID().slice(0, 8)}`;
   const now = new Date().toISOString();
 
-  db.prepare(`
+  await db.run(`
     INSERT INTO leadership_users (id, username, full_name, email, password_hash, password_salt, role, is_active, created_at)
     VALUES (?, ?, ?, ?, ?, ?, 'LEADER', 1, ?)
-  `).run(id, cleanUsername, cleanName, cleanEmail, hash, salt, now);
+  `, [id, cleanUsername, cleanName, cleanEmail, hash, salt, now]);
 
   return { id, username: cleanUsername, full_name: cleanName, email: cleanEmail, created_at: now };
 }
 
-function verifyLeadershipUser(username, password) {
+async function verifyLeadershipUser(username, password) {
   const cleanUsername = String(username || '').trim().toLowerCase();
-  const user = db.prepare('SELECT * FROM leadership_users WHERE username = ?').get(cleanUsername);
+  const user = await db.get('SELECT * FROM leadership_users WHERE username = ?', [cleanUsername]);
 
   if (!user || !user.is_active) {
     return null;
@@ -86,7 +77,7 @@ function verifyLeadershipUser(username, password) {
   }
 
   const now = new Date().toISOString();
-  db.prepare('UPDATE leadership_users SET last_login_at = ? WHERE id = ?').run(now, user.id);
+  await db.run('UPDATE leadership_users SET last_login_at = ? WHERE id = ?', [now, user.id]);
 
   return {
     id: user.id,
@@ -97,27 +88,27 @@ function verifyLeadershipUser(username, password) {
   };
 }
 
-function createSession(userId, username, ip, userAgent) {
+async function createSession(userId, username, ip, userAgent) {
   const sessionId = `sw_sess_${crypto.randomBytes(32).toString('hex')}`;
   const now = new Date().toISOString();
 
-  db.prepare(`
+  await db.run(`
     INSERT INTO leadership_sessions (id, user_id, username, ip_address, user_agent, created_at, last_activity_at, duration_seconds)
     VALUES (?, ?, ?, ?, ?, ?, ?, 0)
-  `).run(sessionId, userId, username, ip || '', userAgent || '', now, now);
+  `, [sessionId, userId, username, ip || '', userAgent || '', now, now]);
 
   return sessionId;
 }
 
-function validateSession(token) {
+async function validateSession(token) {
   if (!token) return null;
 
-  const session = db.prepare(`
+  const session = await db.get(`
     SELECT s.*, u.full_name, u.email, u.role
     FROM leadership_sessions s
     JOIN leadership_users u ON s.user_id = u.id
     WHERE s.id = ? AND s.ended_at IS NULL AND u.is_active = 1
-  `).get(token);
+  `, [token]);
 
   if (!session) return null;
 
@@ -125,11 +116,11 @@ function validateSession(token) {
   const createdTime = new Date(session.created_at);
   const durationSeconds = Math.max(0, Math.floor((now.getTime() - createdTime.getTime()) / 1000));
 
-  db.prepare(`
+  await db.run(`
     UPDATE leadership_sessions 
     SET last_activity_at = ?, duration_seconds = ?
     WHERE id = ?
-  `).run(now.toISOString(), durationSeconds, token);
+  `, [now.toISOString(), durationSeconds, token]);
 
   return {
     sessionId: session.id,
@@ -142,27 +133,27 @@ function validateSession(token) {
   };
 }
 
-function endSession(token) {
+async function endSession(token) {
   if (!token) return;
   const now = new Date();
-  const session = db.prepare('SELECT * FROM leadership_sessions WHERE id = ?').get(token);
+  const session = await db.get('SELECT * FROM leadership_sessions WHERE id = ?', [token]);
   if (session) {
     const createdTime = new Date(session.created_at);
     const durationSeconds = Math.max(0, Math.floor((now.getTime() - createdTime.getTime()) / 1000));
-    db.prepare(`
+    await db.run(`
       UPDATE leadership_sessions SET ended_at = ?, duration_seconds = ? WHERE id = ?
-    `).run(now.toISOString(), durationSeconds, token);
+    `, [now.toISOString(), durationSeconds, token]);
   }
 }
 
-function recordAuditLog({ sessionId, userId, username, actionType, targetId, targetName, description, details, ip }) {
+async function recordAuditLog({ sessionId, userId, username, actionType, targetId, targetName, description, details, ip }) {
   const now = new Date().toISOString();
   const detailsStr = details ? JSON.stringify(details) : null;
 
-  db.prepare(`
+  await db.run(`
     INSERT INTO audit_logs (session_id, user_id, username, action_type, target_id, target_name, description, details_json, ip_address, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
+  `, [
     sessionId || '',
     userId || 'SYSTEM',
     username || 'SYSTEM',
@@ -173,7 +164,7 @@ function recordAuditLog({ sessionId, userId, username, actionType, targetId, tar
     detailsStr,
     ip || '',
     now
-  );
+  ]);
 }
 
 module.exports = {
