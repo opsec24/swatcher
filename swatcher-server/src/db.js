@@ -17,18 +17,41 @@ if (isPostgres) {
   });
 } else {
   console.log('[swatcher-db] Using Embedded SQLite Database (Local Mode)...');
+  const dataDir = path.join(__dirname, '..', 'data');
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+  const dbPath = path.join(dataDir, 'swatcher.db');
+
+  let initialized = false;
+
+  // 1. Try built-in node:sqlite (available in Node.js >= 22.5.0)
   try {
     const { DatabaseSync } = require('node:sqlite');
-    const dataDir = path.join(__dirname, '..', 'data');
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    const dbPath = path.join(dataDir, 'swatcher.db');
     sqliteDb = new DatabaseSync(dbPath);
     sqliteDb.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
+    initialized = true;
+    console.log('[swatcher-db] Initialized via node:sqlite (Node.js built-in)');
   } catch (err) {
-    console.error('[swatcher-db] Error initializing SQLite:', err.message);
-    throw err;
+    // node:sqlite not supported in this Node version; fall through to better-sqlite3
+  }
+
+  // 2. Fall back to better-sqlite3 (supports Node.js 16, 18, 20, 22 on Kali, Linux, Windows, macOS)
+  if (!initialized) {
+    try {
+      const Database = require('better-sqlite3');
+      sqliteDb = new Database(dbPath);
+      sqliteDb.pragma('journal_mode = WAL');
+      sqliteDb.pragma('foreign_keys = ON');
+      initialized = true;
+      console.log('[swatcher-db] Initialized via better-sqlite3 (universal Node compatibility)');
+    } catch (err) {
+      console.error('\n[swatcher-db] FATAL: Could not initialize SQLite database.');
+      console.error('Neither "node:sqlite" (Node 22+) nor "better-sqlite3" could be loaded.');
+      console.error('Please ensure you have run "npm install" inside swatcher-server:\n');
+      console.error('    cd swatcher-server && npm install\n');
+      throw err;
+    }
   }
 }
 

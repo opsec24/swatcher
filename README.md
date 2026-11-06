@@ -158,13 +158,41 @@ To serve the dashboard and API over HTTPS on standard port 443 with an SSL certi
 
 ---
 
-## Local Development (Without Docker)
+## 💻 Cross-Platform Quick Start (Windows, Kali Linux, macOS)
 
-You can also run the server directly on your local machine using embedded SQLite:
+You can run `swatcher` either in enterprise **Docker mode (PostgreSQL 16)** or in lightweight **Standalone Local Mode (Node.js + Embedded SQLite)** on any operating system:
 
+### Windows (PowerShell or CMD)
+```cmd
+# Double click or run in CMD:
+run.bat
+
+# Or run in PowerShell:
+.\run.ps1
+
+# To force standalone Node.js local mode (no Docker):
+run.bat --local
+```
+
+### Kali Linux, Debian, Ubuntu & macOS
 ```bash
-cd swatcher-server
-npm install
-npm run seed     # Seeds realistic demo pentesters, engagements, and traffic
-npm start        # Runs on port 9090
+chmod +x run.sh
+
+# Enterprise Docker Compose Mode (installs Docker if needed & boots PostgreSQL):
+./run.sh
+
+# Standalone Local Mode (Node.js + SQLite, zero Docker required):
+./run.sh --local
+```
+
+### Pure npm (Any OS from Repository Root)
+```bash
+# 1. Install dependencies
+npm run install:server
+
+# 2. Seed realistic demo data (optional)
+npm run seed
+
+# 3. Start swatcher server on port 9090
+npm start
 ```
