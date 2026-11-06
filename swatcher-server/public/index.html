@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" class="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>swatcher // Leadership & Pentest Operations Center</title>
+  <title>swatcher // Enterprise Pentest Operations & Governance</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -13,54 +13,57 @@
       theme: {
         extend: {
           colors: {
-            brand: { 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' },
-            surface: { 800: '#18181b', 900: '#09090b', 950: '#040406' }
+            brand: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#4f46e5', 600: '#4338ca', 700: '#3730a3' }
           }
         }
       }
     }
   </script>
   <style>
-    body { background-color: #09090b; color: #e4e4e7; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
     ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #18181b; }
-    ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .dark ::-webkit-scrollbar-thumb { background: #334155; }
   </style>
 </head>
-<body class="min-h-screen flex flex-col">
+<body class="min-h-screen flex flex-col bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-200">
 
   <!-- ============================================================ -->
   <!-- 1. AUTH SCREEN OVERLAYS (First-Time Setup & Login) -->
   <!-- ============================================================ -->
-  <div id="auth-container" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-surface-950">
+  <div id="auth-container" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm">
     <!-- Setup Card -->
-    <div id="setup-card" class="hidden bg-surface-800 border border-indigo-500/40 rounded-2xl max-w-md w-full p-8 shadow-2xl space-y-6">
+    <div id="setup-card" class="hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-8 shadow-2xl space-y-6">
       <div class="text-center space-y-2">
-        <div class="w-12 h-12 rounded-xl bg-indigo-600 flex items-center justify-center text-white mx-auto shadow-lg shadow-indigo-500/30">
+        <div class="w-12 h-12 rounded-xl bg-indigo-600 flex items-center justify-center text-white mx-auto shadow-md shadow-indigo-600/20">
           <i class="fa-solid fa-satellite-dish text-xl"></i>
         </div>
-        <h2 class="text-xl font-bold text-white tracking-tight">Welcome to swatcher</h2>
-        <p class="text-xs text-zinc-400">First-time deployment detected. Create your initial Leadership Administrator account to secure operations.</p>
+        <h2 class="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Welcome to swatcher</h2>
+        <p class="text-xs text-slate-500 dark:text-slate-400">First-time deployment detected. Create your initial Leadership Administrator account to secure operations.</p>
       </div>
 
       <form onsubmit="handleInitialSetup(event)" class="space-y-4 text-xs">
         <div>
-          <label class="block text-zinc-300 font-semibold mb-1">Full Name</label>
-          <input type="text" id="setup-fullname" required placeholder="e.g. AppSec Lead" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-zinc-200 focus:outline-none focus:border-indigo-500">
+          <label class="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Full Name</label>
+          <input type="text" id="setup-fullname" required placeholder="e.g. AppSec Lead" class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600">
         </div>
         <div>
-          <label class="block text-zinc-300 font-semibold mb-1">Admin Username</label>
-          <input type="text" id="setup-username" required placeholder="e.g. admin" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-zinc-200 mono focus:outline-none focus:border-indigo-500">
+          <label class="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Admin Username</label>
+          <input type="text" id="setup-username" required placeholder="e.g. admin" class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600">
         </div>
         <div>
-          <label class="block text-zinc-300 font-semibold mb-1">Corporate Email</label>
-          <input type="email" id="setup-email" required placeholder="e.g. lead@corp.internal" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-zinc-200 focus:outline-none focus:border-indigo-500">
+          <label class="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Corporate Email</label>
+          <input type="email" id="setup-email" required placeholder="e.g. lead@corp.internal" class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600">
         </div>
         <div>
-          <label class="block text-zinc-300 font-semibold mb-1">Master Password (Complexity Enforced)</label>
-          <input type="password" id="setup-password" required oninput="checkComplexity(this.value, 'setup-rules')" placeholder="Min 10 chars, upper, lower, num, special" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-zinc-200 focus:outline-none focus:border-indigo-500">
-          <div id="setup-rules" class="mt-2 p-2.5 rounded bg-zinc-900/80 border border-zinc-800 text-[11px] space-y-1 text-zinc-400">
+          <label class="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Master Password (Complexity Enforced)</label>
+          <input type="password" id="setup-password" required oninput="checkComplexity(this.value, 'setup-rules')" placeholder="Min 10 chars, upper, lower, num, special" class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600">
+          <div id="setup-rules" class="mt-2 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-[11px] space-y-1 text-slate-500 dark:text-slate-400">
             <div id="rule-len"><i class="fa-solid fa-circle-dot text-[8px] mr-1.5"></i>At least 10 characters</div>
             <div id="rule-case"><i class="fa-solid fa-circle-dot text-[8px] mr-1.5"></i>Uppercase & lowercase letters</div>
             <div id="rule-num"><i class="fa-solid fa-circle-dot text-[8px] mr-1.5"></i>At least one number (0-9)</div>
@@ -68,33 +71,33 @@
           </div>
         </div>
 
-        <button type="submit" class="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition shadow-lg shadow-indigo-600/30">
+        <button type="submit" class="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition shadow-sm">
           Initialize System & Sign In
         </button>
       </form>
     </div>
 
     <!-- Login Card -->
-    <div id="login-card" class="hidden bg-surface-800 border border-zinc-800 rounded-2xl max-w-sm w-full p-8 shadow-2xl space-y-6">
+    <div id="login-card" class="hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-sm w-full p-8 shadow-2xl space-y-6">
       <div class="text-center space-y-2">
-        <div class="w-12 h-12 rounded-xl bg-indigo-600 flex items-center justify-center text-white mx-auto shadow-lg shadow-indigo-500/30">
+        <div class="w-12 h-12 rounded-xl bg-indigo-600 flex items-center justify-center text-white mx-auto shadow-md shadow-indigo-600/20">
           <i class="fa-solid fa-shield-halved text-xl"></i>
         </div>
-        <h2 class="text-xl font-bold text-white tracking-tight">swatcher Leadership Login</h2>
-        <p class="text-xs text-zinc-400">Sign in to access pentest operations, active metrics, and audit logs.</p>
+        <h2 class="text-xl font-bold text-slate-900 dark:text-white tracking-tight">swatcher Leadership Login</h2>
+        <p class="text-xs text-slate-500 dark:text-slate-400">Sign in to access pentest operations, active metrics, and audit logs.</p>
       </div>
 
       <form onsubmit="handleLogin(event)" class="space-y-4 text-xs">
         <div>
-          <label class="block text-zinc-300 font-semibold mb-1">Username</label>
-          <input type="text" id="login-username" required placeholder="e.g. admin" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-zinc-200 mono focus:outline-none focus:border-indigo-500">
+          <label class="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Username</label>
+          <input type="text" id="login-username" required placeholder="e.g. admin" class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600">
         </div>
         <div>
-          <label class="block text-zinc-300 font-semibold mb-1">Password</label>
-          <input type="password" id="login-password" required placeholder="Enter password" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-zinc-200 focus:outline-none focus:border-indigo-500">
+          <label class="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Password</label>
+          <input type="password" id="login-password" required placeholder="Enter password" class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600">
         </div>
 
-        <button type="submit" class="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition shadow-lg shadow-indigo-600/30">
+        <button type="submit" class="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition shadow-sm">
           Sign In
         </button>
       </form>
@@ -107,44 +110,53 @@
   <div id="app-container" class="hidden flex-1 flex flex-col">
 
     <!-- Top Navigation Bar -->
-    <header class="bg-surface-800 border-b border-zinc-800 sticky top-0 z-40 px-6 py-3 flex items-center justify-between">
-      <div class="flex items-center space-x-4">
-        <div class="flex items-center space-x-2">
-          <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
+    <header class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 px-6 py-3 flex items-center justify-between shadow-xs">
+      <div class="flex items-center space-x-6">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-xs">
             <i class="fa-solid fa-satellite-dish text-sm"></i>
           </div>
-          <span class="text-xl font-bold tracking-tight text-white">swatcher</span>
-          <span class="text-xs px-2 py-0.5 rounded bg-zinc-800 text-indigo-400 border border-zinc-700 mono">LEADERSHIP</span>
+          <span class="text-xl font-bold tracking-tight text-slate-900 dark:text-white">swatcher</span>
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60 mono">ENTERPRISE</span>
         </div>
 
-        <nav class="hidden md:flex items-center space-x-1 pl-6 border-l border-zinc-800 text-sm">
-          <button onclick="switchTab('dashboard')" id="tab-btn-dashboard" class="tab-btn px-3 py-1.5 rounded-md font-medium text-white bg-zinc-700/60 transition">
-            <i class="fa-solid fa-gauge-high mr-1.5 text-indigo-400"></i> Dashboard
+        <nav class="hidden md:flex items-center space-x-1 pl-6 border-l border-slate-200 dark:border-slate-800 text-xs">
+          <button onclick="switchTab('dashboard')" id="tab-btn-dashboard" class="tab-btn px-3 py-1.5 rounded-lg font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800/60 transition">
+            <i class="fa-solid fa-gauge-high mr-1.5 text-indigo-600 dark:text-indigo-400"></i> Dashboard
           </button>
-          <button onclick="switchTab('pentesters')" id="tab-btn-pentesters" class="tab-btn px-3 py-1.5 rounded-md font-medium text-zinc-400 hover:text-white transition">
-            <i class="fa-solid fa-users-gear mr-1.5 text-emerald-400"></i> Pentesters & Keys
+          <button onclick="switchTab('pentesters')" id="tab-btn-pentesters" class="tab-btn px-3 py-1.5 rounded-lg font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+            <i class="fa-solid fa-users-gear mr-1.5 text-emerald-600 dark:text-emerald-400"></i> Pentesters & Keys
           </button>
-          <button onclick="switchTab('audit')" id="tab-btn-audit" class="tab-btn px-3 py-1.5 rounded-md font-medium text-zinc-400 hover:text-white transition">
-            <i class="fa-solid fa-fingerprint mr-1.5 text-amber-400"></i> Audit Trail
+          <button onclick="switchTab('audit')" id="tab-btn-audit" class="tab-btn px-3 py-1.5 rounded-lg font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+            <i class="fa-solid fa-fingerprint mr-1.5 text-amber-600 dark:text-amber-400"></i> Audit Trail
           </button>
-          <button onclick="switchTab('logs')" id="tab-btn-logs" class="tab-btn px-3 py-1.5 rounded-md font-medium text-zinc-400 hover:text-white transition">
-            <i class="fa-solid fa-terminal mr-1.5 text-cyan-400"></i> Traffic Logs
+          <button onclick="switchTab('logs')" id="tab-btn-logs" class="tab-btn px-3 py-1.5 rounded-lg font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+            <i class="fa-solid fa-terminal mr-1.5 text-cyan-600 dark:text-cyan-400"></i> Traffic Logs
           </button>
         </nav>
       </div>
 
       <div class="flex items-center space-x-3">
-        <button onclick="openCreateUserModal()" class="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 text-xs font-medium transition flex items-center space-x-1.5" title="Add another leadership user">
-          <i class="fa-solid fa-user-plus text-indigo-400"></i>
+        <!-- Theme Toggle Button -->
+        <button onclick="toggleTheme()" id="theme-toggle-btn" class="p-1.5 px-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-medium transition flex items-center space-x-1" title="Toggle Light / Dark Mode">
+          <i id="theme-icon" class="fa-solid fa-moon"></i>
+          <span id="theme-text" class="hidden sm:inline">Theme</span>
+        </button>
+
+        <!-- Add Admin User Button -->
+        <button onclick="openCreateUserModal()" class="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-semibold transition flex items-center space-x-1.5" title="Add another leadership user">
+          <i class="fa-solid fa-user-plus text-indigo-600 dark:text-indigo-400"></i>
           <span class="hidden sm:inline">Add Admin</span>
         </button>
 
-        <div class="flex items-center space-x-2 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-xs">
-          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-          <span id="nav-username" class="mono text-zinc-200 font-semibold">admin</span>
+        <!-- Active Leader Pill -->
+        <div class="flex items-center space-x-2 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span id="nav-username" class="mono text-slate-800 dark:text-slate-200 font-semibold">admin</span>
         </div>
 
-        <button onclick="handleLogout()" class="p-1.5 px-2.5 text-xs text-rose-400 hover:bg-rose-950/40 border border-zinc-800 hover:border-rose-900 rounded-lg transition" title="Log Out">
+        <!-- Logout Button -->
+        <button onclick="handleLogout()" class="p-1.5 px-2.5 text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-slate-200 dark:border-slate-700 hover:border-rose-300 dark:hover:border-rose-800 rounded-lg transition" title="Log Out">
           <i class="fa-solid fa-right-from-bracket mr-1"></i> Logout
         </button>
       </div>
@@ -161,96 +173,96 @@
         <!-- THE 4 REQUIRED CORE KPI CARDS -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <!-- Card 1: Current Number of Pentesters -->
-          <div class="bg-surface-800 border border-zinc-800 rounded-xl p-5 shadow">
-            <div class="flex items-center justify-between text-xs text-zinc-400 font-medium">
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
+            <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
               <span>Current Pentesters</span>
-              <div class="w-8 h-8 rounded-lg bg-indigo-950/60 border border-indigo-800/60 flex items-center justify-center text-indigo-400">
+              <div class="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-800/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
                 <i class="fa-solid fa-users-gear text-sm"></i>
               </div>
             </div>
             <div class="mt-3 flex items-baseline space-x-2">
-              <span id="card-pentesters" class="text-3xl font-extrabold text-white mono">0</span>
-              <span class="text-xs text-emerald-400 font-medium">Active Team</span>
+              <span id="card-pentesters" class="text-3xl font-extrabold text-slate-900 dark:text-white mono">0</span>
+              <span class="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">Active Team</span>
             </div>
-            <div class="text-[11px] text-zinc-500 mt-1">Registered API key holders</div>
+            <div class="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Registered API key holders</div>
           </div>
 
           <!-- Card 2: Number of Pentests in Progress -->
-          <div class="bg-surface-800 border border-zinc-800 rounded-xl p-5 shadow">
-            <div class="flex items-center justify-between text-xs text-zinc-400 font-medium">
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
+            <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
               <span>Pentests In Progress</span>
-              <div class="w-8 h-8 rounded-lg bg-emerald-950/60 border border-emerald-800/60 flex items-center justify-center text-emerald-400">
+              <div class="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-100 dark:border-emerald-800/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                 <i class="fa-solid fa-bars-progress text-sm"></i>
               </div>
             </div>
             <div class="mt-3 flex items-baseline space-x-2">
-              <span id="card-in-progress" class="text-3xl font-extrabold text-emerald-400 mono">0</span>
-              <span class="text-xs text-zinc-400 font-medium">Active RITMs</span>
+              <span id="card-in-progress" class="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 mono">0</span>
+              <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">Active RITMs</span>
             </div>
-            <div class="text-[11px] text-zinc-500 mt-1">Currently being assessed</div>
+            <div class="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Currently being assessed</div>
           </div>
 
           <!-- Card 3: Total Hours Spent Current Month -->
-          <div class="bg-surface-800 border border-zinc-800 rounded-xl p-5 shadow">
-            <div class="flex items-center justify-between text-xs text-zinc-400 font-medium">
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
+            <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
               <span>Hours Spent (Current Month)</span>
-              <div class="w-8 h-8 rounded-lg bg-amber-950/60 border border-amber-800/60 flex items-center justify-center text-amber-400">
+              <div class="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/60 border border-amber-100 dark:border-amber-800/60 flex items-center justify-center text-amber-600 dark:text-amber-400">
                 <i class="fa-regular fa-calendar-check text-sm"></i>
               </div>
             </div>
             <div class="mt-3 flex items-baseline space-x-1">
-              <span id="card-month-hours" class="text-3xl font-extrabold text-amber-400 mono">0.0</span>
-              <span class="text-xs text-zinc-400">hrs</span>
+              <span id="card-month-hours" class="text-3xl font-extrabold text-amber-600 dark:text-amber-400 mono">0.0</span>
+              <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">hrs</span>
             </div>
-            <div class="text-[11px] text-zinc-500 mt-1">Across all monthly pentests</div>
+            <div class="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Across all monthly pentests</div>
           </div>
 
           <!-- Card 4: Total Pending / Remaining Hours -->
-          <div class="bg-surface-800 border border-zinc-800 rounded-xl p-5 shadow">
-            <div class="flex items-center justify-between text-xs text-zinc-400 font-medium">
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
+            <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
               <span>Total Hours Pending</span>
-              <div class="w-8 h-8 rounded-lg bg-purple-950/60 border border-purple-800/60 flex items-center justify-center text-purple-400">
+              <div class="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/60 border border-purple-100 dark:border-purple-800/60 flex items-center justify-center text-purple-600 dark:text-purple-400">
                 <i class="fa-solid fa-hourglass-half text-sm"></i>
               </div>
             </div>
             <div class="mt-3 flex items-baseline space-x-1">
-              <span id="card-pending-hours" class="text-3xl font-extrabold text-purple-400 mono">0.0</span>
-              <span class="text-xs text-zinc-400">hrs</span>
+              <span id="card-pending-hours" class="text-3xl font-extrabold text-purple-600 dark:text-purple-400 mono">0.0</span>
+              <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">hrs</span>
             </div>
-            <div class="text-[11px] text-zinc-500 mt-1">Remaining budget to deliver</div>
+            <div class="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Remaining budget to deliver</div>
           </div>
         </div>
 
         <!-- MAIN LIST: APPLICATION ID, RITM, PENTESTERS & PENDING EFFORT PROGRESS BAR -->
-        <div class="bg-surface-800 border border-zinc-800 rounded-xl p-5 shadow space-y-4">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs space-y-4">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h3 class="text-base font-bold text-white flex items-center space-x-2">
-                <i class="fa-solid fa-list-check text-indigo-400"></i>
+              <h3 class="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                <i class="fa-solid fa-list-check text-indigo-600 dark:text-indigo-400"></i>
                 <span>Active Pentests & Progress Tracking</span>
               </h3>
-              <p class="text-xs text-zinc-400">Click any engagement row to inspect deep-dive traffic, endpoints touched, and tester breakdown.</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Click any engagement row to inspect deep-dive traffic, endpoints touched, and tester breakdown.</p>
             </div>
 
             <!-- Batch Action Controls -->
             <div class="flex items-center space-x-2">
-              <button id="batch-delete-ritm-btn" onclick="handleBatchDeleteRitms()" class="hidden px-3 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-300 text-xs font-semibold transition flex items-center space-x-1">
+              <button id="batch-delete-ritm-btn" onclick="handleBatchDeleteRitms()" class="hidden px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 dark:hover:bg-rose-900 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-semibold transition flex items-center space-x-1">
                 <i class="fa-solid fa-trash"></i>
                 <span id="batch-ritm-count">Delete Selected (0)</span>
               </button>
-              <button onclick="refreshDashboard()" class="p-1.5 text-zinc-400 hover:text-white rounded-lg bg-zinc-900 border border-zinc-700" title="Refresh List">
-                <i class="fa-solid fa-rotate-right text-xs"></i>
+              <button onclick="refreshDashboard()" class="p-1.5 px-2.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium" title="Refresh List">
+                <i class="fa-solid fa-rotate-right text-xs mr-1"></i> Refresh
               </button>
             </div>
           </div>
 
           <!-- Engagements Table -->
-          <div class="overflow-hidden border border-zinc-800 rounded-xl">
+          <div class="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-xl">
             <table class="w-full text-left text-xs">
-              <thead class="bg-zinc-900 border-b border-zinc-800 text-zinc-400 uppercase tracking-wider font-semibold">
+              <thead class="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 uppercase tracking-wider font-semibold">
                 <tr>
                   <th class="p-3 w-8">
-                    <input type="checkbox" id="select-all-ritms" onchange="toggleSelectAllRitms(this.checked)" class="rounded bg-zinc-950 border-zinc-700">
+                    <input type="checkbox" id="select-all-ritms" onchange="toggleSelectAllRitms(this.checked)" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
                   </th>
                   <th class="p-3">Application ID</th>
                   <th class="p-3">RITM Project</th>
@@ -260,7 +272,7 @@
                   <th class="p-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody id="engagements-table-body" class="divide-y divide-zinc-800">
+              <tbody id="engagements-table-body" class="divide-y divide-slate-100 dark:divide-slate-800">
                 <!-- Rendered dynamically via JS -->
               </tbody>
             </table>
@@ -274,50 +286,50 @@
       <!-- ============================================================ -->
       <section id="view-engagement-detail" class="hidden space-y-6">
         <div class="flex items-center justify-between">
-          <button onclick="switchTab('dashboard')" class="px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium transition flex items-center space-x-2">
+          <button onclick="switchTab('dashboard')" class="px-3.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-semibold transition flex items-center space-x-2 shadow-xs">
             <i class="fa-solid fa-arrow-left"></i>
             <span>Back to Dashboard</span>
           </button>
           <div class="flex items-center space-x-2">
-            <span id="detail-ritm-badge" class="px-3 py-1 rounded-lg bg-zinc-900 border border-zinc-700 text-white font-bold mono text-sm"></span>
-            <span id="detail-appid-badge" class="px-3 py-1 rounded-lg bg-indigo-950 text-indigo-300 border border-indigo-800 mono text-xs"></span>
+            <span id="detail-ritm-badge" class="px-3 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold mono text-sm"></span>
+            <span id="detail-appid-badge" class="px-3 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 mono text-xs font-bold"></span>
           </div>
         </div>
 
         <!-- Detail KPI Header Cards -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div class="bg-surface-800 border border-zinc-800 rounded-xl p-4">
-            <div class="text-xs text-zinc-400 font-medium">Allocated vs Tested</div>
-            <div class="mt-2 text-xl font-bold mono text-white">
-              <span id="detail-tested-hrs" class="text-emerald-400">0</span> / <span id="detail-alloc-hrs">0</span> hrs
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs">
+            <div class="text-xs text-slate-500 dark:text-slate-400 font-medium">Allocated vs Tested</div>
+            <div class="mt-2 text-xl font-bold mono text-slate-900 dark:text-white">
+              <span id="detail-tested-hrs" class="text-emerald-600 dark:text-emerald-400">0</span> / <span id="detail-alloc-hrs">0</span> hrs
             </div>
-            <div class="text-[11px] text-zinc-500 mt-1" id="detail-pending-text">0 hrs pending</div>
+            <div class="text-[11px] text-slate-400 dark:text-slate-500 mt-1" id="detail-pending-text">0 hrs pending</div>
           </div>
-          <div class="bg-surface-800 border border-zinc-800 rounded-xl p-4">
-            <div class="text-xs text-zinc-400 font-medium">Manual vs Automated</div>
-            <div class="mt-2 text-xl font-bold mono text-white">
-              <span id="detail-manual-hrs" class="text-emerald-400">0</span>h <span class="text-xs text-zinc-500 font-normal">manual</span>
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs">
+            <div class="text-xs text-slate-500 dark:text-slate-400 font-medium">Manual vs Automated</div>
+            <div class="mt-2 text-xl font-bold mono text-slate-900 dark:text-white">
+              <span id="detail-manual-hrs" class="text-emerald-600 dark:text-emerald-400">0</span>h <span class="text-xs text-slate-400 font-normal">manual</span>
             </div>
-            <div class="text-[11px] text-purple-400 mt-1" id="detail-auto-hrs">0h automated scans</div>
+            <div class="text-[11px] text-purple-600 dark:text-purple-400 mt-1" id="detail-auto-hrs">0h automated scans</div>
           </div>
-          <div class="bg-surface-800 border border-zinc-800 rounded-xl p-4">
-            <div class="text-xs text-zinc-400 font-medium">Total Requests</div>
-            <div class="mt-2 text-xl font-bold mono text-white" id="detail-req-count">0</div>
-            <div class="text-[11px] text-zinc-500 mt-1">Logged Burp events</div>
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs">
+            <div class="text-xs text-slate-500 dark:text-slate-400 font-medium">Total Requests</div>
+            <div class="mt-2 text-xl font-bold mono text-slate-900 dark:text-white" id="detail-req-count">0</div>
+            <div class="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Logged Burp events</div>
           </div>
-          <div class="bg-surface-800 border border-zinc-800 rounded-xl p-4">
-            <div class="text-xs text-zinc-400 font-medium">Unique Endpoints Touched</div>
-            <div class="mt-2 text-xl font-bold mono text-amber-400" id="detail-endpoints-count">0</div>
-            <div class="text-[11px] text-zinc-500 mt-1">In-scope attack surface</div>
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs">
+            <div class="text-xs text-slate-500 dark:text-slate-400 font-medium">Unique Endpoints Touched</div>
+            <div class="mt-2 text-xl font-bold mono text-amber-600 dark:text-amber-400" id="detail-endpoints-count">0</div>
+            <div class="text-[11px] text-slate-400 dark:text-slate-500 mt-1">In-scope attack surface</div>
           </div>
         </div>
 
         <!-- Detail Breakdown: Testers + Unique Endpoints -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <!-- Testers on this engagement -->
-          <div class="bg-surface-800 border border-zinc-800 rounded-xl p-5 shadow space-y-3">
-            <h4 class="text-sm font-bold text-white flex items-center space-x-2">
-              <i class="fa-solid fa-users text-indigo-400"></i>
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs space-y-3">
+            <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+              <i class="fa-solid fa-users text-indigo-600 dark:text-indigo-400"></i>
               <span>Contributing Pentesters on this RITM</span>
             </h4>
             <div id="detail-testers-list" class="space-y-2 text-xs">
@@ -326,9 +338,9 @@
           </div>
 
           <!-- Tool Volume for this RITM -->
-          <div class="bg-surface-800 border border-zinc-800 rounded-xl p-5 shadow space-y-3">
-            <h4 class="text-sm font-bold text-white flex items-center space-x-2">
-              <i class="fa-solid fa-screwdriver-wrench text-cyan-400"></i>
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs space-y-3">
+            <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+              <i class="fa-solid fa-screwdriver-wrench text-cyan-600 dark:text-cyan-400"></i>
               <span>Tool Volume Distribution</span>
             </h4>
             <div id="detail-tools-list" class="space-y-2 text-xs">
@@ -338,19 +350,19 @@
         </div>
 
         <!-- Endpoints Table for this RITM -->
-        <div class="bg-surface-800 border border-zinc-800 rounded-xl p-5 shadow space-y-3">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs space-y-3">
           <div class="flex items-center justify-between">
-            <h4 class="text-sm font-bold text-white flex items-center space-x-2">
-              <i class="fa-solid fa-bullseye text-amber-400"></i>
+            <h4 class="text-sm font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+              <i class="fa-solid fa-bullseye text-amber-600 dark:text-amber-400"></i>
               <span>In-Scope Endpoints Probed</span>
             </h4>
-            <button onclick="inspectRitmLogs()" class="px-3 py-1 rounded bg-indigo-950 text-indigo-300 border border-indigo-800 hover:bg-indigo-900 text-xs font-medium">
+            <button onclick="inspectRitmLogs()" class="px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-xs font-semibold">
               View All Raw Requests &rarr;
             </button>
           </div>
-          <div class="overflow-x-auto border border-zinc-800 rounded-lg max-h-80">
+          <div class="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-lg max-h-80">
             <table class="w-full text-left text-xs">
-              <thead class="bg-zinc-900 text-zinc-400 uppercase font-semibold">
+              <thead class="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 uppercase font-semibold">
                 <tr>
                   <th class="p-2.5">Method</th>
                   <th class="p-2.5">Host</th>
@@ -360,7 +372,7 @@
                   <th class="p-2.5">Last Seen</th>
                 </tr>
               </thead>
-              <tbody id="detail-endpoints-tbody" class="divide-y divide-zinc-800 mono">
+              <tbody id="detail-endpoints-tbody" class="divide-y divide-slate-100 dark:divide-slate-800 mono">
                 <!-- Rendered via JS -->
               </tbody>
             </table>
@@ -374,27 +386,27 @@
       <section id="view-pentesters" class="hidden space-y-4">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 class="text-lg font-bold text-white">Pentester Profiles & Ingestion Tokens</h2>
-            <p class="text-xs text-zinc-400">Manage team members, generate cryptographically random keys, or delete inactive profiles.</p>
+            <h2 class="text-lg font-bold text-slate-900 dark:text-white">Pentester Profiles & Ingestion Tokens</h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Manage team members, generate cryptographically random keys, or revoke inactive profiles.</p>
           </div>
           <div class="flex items-center space-x-2">
-            <button id="batch-delete-tester-btn" onclick="handleBatchDeleteTesters()" class="hidden px-3.5 py-2 rounded-lg bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-300 text-xs font-semibold transition flex items-center space-x-1.5">
+            <button id="batch-delete-tester-btn" onclick="handleBatchDeleteTesters()" class="hidden px-3.5 py-2 rounded-lg bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 dark:hover:bg-rose-900 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-semibold transition flex items-center space-x-1.5">
               <i class="fa-solid fa-trash"></i>
               <span id="batch-tester-count">Delete Selected (0)</span>
             </button>
-            <button onclick="openAddTesterModal()" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-500/20 transition flex items-center space-x-2">
+            <button onclick="openAddTesterModal()" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition flex items-center space-x-2">
               <i class="fa-solid fa-user-plus"></i>
               <span>Add Pentester</span>
             </button>
           </div>
         </div>
 
-        <div class="bg-surface-800 border border-zinc-800 rounded-xl overflow-hidden shadow">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
           <table class="w-full text-left text-xs">
-            <thead class="bg-zinc-900 border-b border-zinc-800 text-zinc-400 uppercase tracking-wider font-semibold">
+            <thead class="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 uppercase tracking-wider font-semibold">
               <tr>
                 <th class="p-3.5 w-8">
-                  <input type="checkbox" id="select-all-testers" onchange="toggleSelectAllTesters(this.checked)" class="rounded bg-zinc-950 border-zinc-700">
+                  <input type="checkbox" id="select-all-testers" onchange="toggleSelectAllTesters(this.checked)" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
                 </th>
                 <th class="p-3.5">Pentester</th>
                 <th class="p-3.5">Username / Email</th>
@@ -405,7 +417,7 @@
                 <th class="p-3.5 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody id="pentesters-table-body" class="divide-y divide-zinc-800">
+            <tbody id="pentesters-table-body" class="divide-y divide-slate-100 dark:divide-slate-800">
               <!-- Rendered via JS -->
             </tbody>
           </table>
@@ -417,16 +429,16 @@
       <!-- ============================================================ -->
       <section id="view-audit" class="hidden space-y-4">
         <div>
-          <h2 class="text-lg font-bold text-white flex items-center space-x-2">
-            <i class="fa-solid fa-fingerprint text-amber-400"></i>
+          <h2 class="text-lg font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+            <i class="fa-solid fa-fingerprint text-amber-600 dark:text-amber-400"></i>
             <span>Leadership User Action Audit Trail</span>
           </h2>
-          <p class="text-xs text-zinc-400">Complete, tamper-evident log of all leadership sessions, logins, logouts, creation, and deletion activities.</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Complete, tamper-evident log of all leadership sessions, logins, logouts, creation, and deletion activities.</p>
         </div>
 
-        <div class="bg-surface-800 border border-zinc-800 rounded-xl overflow-hidden shadow">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
           <table class="w-full text-left text-xs">
-            <thead class="bg-zinc-900 border-b border-zinc-800 text-zinc-400 uppercase tracking-wider font-semibold">
+            <thead class="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 uppercase tracking-wider font-semibold">
               <tr>
                 <th class="p-3.5">Timestamp</th>
                 <th class="p-3.5">Leader User</th>
@@ -437,7 +449,7 @@
                 <th class="p-3.5">Client IP</th>
               </tr>
             </thead>
-            <tbody id="audit-table-body" class="divide-y divide-zinc-800">
+            <tbody id="audit-table-body" class="divide-y divide-slate-100 dark:divide-slate-800">
               <!-- Rendered via JS -->
             </tbody>
           </table>
@@ -450,14 +462,14 @@
       <section id="view-logs" class="hidden space-y-4">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 class="text-lg font-bold text-white">Traffic Log Explorer</h2>
-            <p class="text-xs text-zinc-400">Search and inspect all recorded Burp HTTP requests & responses.</p>
+            <h2 class="text-lg font-bold text-slate-900 dark:text-white">Traffic Log Explorer</h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Search and inspect all recorded Burp HTTP requests & responses.</p>
           </div>
 
           <div class="flex flex-wrap items-center gap-2">
-            <input type="text" id="filter-search" placeholder="Search URL or Path..." oninput="debounceFetchLogs()" class="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500">
+            <input type="text" id="filter-search" placeholder="Search URL or Path..." oninput="debounceFetchLogs()" class="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600">
             
-            <select id="filter-tool" onchange="fetchLogs()" class="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-indigo-500">
+            <select id="filter-tool" onchange="fetchLogs()" class="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600">
               <option value="">All Tools</option>
               <option value="REPEATER">Repeater</option>
               <option value="PROXY">Proxy</option>
@@ -465,15 +477,15 @@
               <option value="INTRUDER">Intruder</option>
             </select>
 
-            <select id="filter-ritm" onchange="fetchLogs()" class="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-indigo-500">
+            <select id="filter-ritm" onchange="fetchLogs()" class="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600">
               <option value="">All RITMs</option>
             </select>
           </div>
         </div>
 
-        <div class="bg-surface-800 border border-zinc-800 rounded-xl overflow-hidden shadow">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
           <table class="w-full text-left text-xs">
-            <thead class="bg-zinc-900 border-b border-zinc-800 text-zinc-400 uppercase tracking-wider font-semibold">
+            <thead class="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 uppercase tracking-wider font-semibold">
               <tr>
                 <th class="p-3">Time</th>
                 <th class="p-3">Tool</th>
@@ -486,17 +498,17 @@
                 <th class="p-3 text-right">Inspect</th>
               </tr>
             </thead>
-            <tbody id="logs-table-body" class="divide-y divide-zinc-800">
+            <tbody id="logs-table-body" class="divide-y divide-slate-100 dark:divide-slate-800">
               <!-- Rendered via JS -->
             </tbody>
           </table>
         </div>
 
-        <div class="flex items-center justify-between text-xs text-zinc-400 px-2">
+        <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 px-2">
           <span id="logs-pagination-info">Showing 0 logs</span>
           <div class="flex items-center space-x-2">
-            <button id="logs-prev-btn" onclick="prevLogsPage()" class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:pointer-events-none transition">Previous</button>
-            <button id="logs-next-btn" onclick="nextLogsPage()" class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:pointer-events-none transition">Next</button>
+            <button id="logs-prev-btn" onclick="prevLogsPage()" class="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 disabled:opacity-40 disabled:pointer-events-none transition">Previous</button>
+            <button id="logs-next-btn" onclick="nextLogsPage()" class="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 disabled:opacity-40 disabled:pointer-events-none transition">Next</button>
           </div>
         </div>
       </section>
@@ -509,120 +521,120 @@
   <!-- ============================================================ -->
 
   <!-- CREATE LEADERSHIP USER MODAL -->
-  <div id="create-user-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-    <div class="bg-surface-800 border border-zinc-700 rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
-      <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
-        <h3 class="text-sm font-bold text-white flex items-center space-x-2">
-          <i class="fa-solid fa-user-shield text-indigo-400"></i>
+  <div id="create-user-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+          <i class="fa-solid fa-user-shield text-indigo-600 dark:text-indigo-400"></i>
           <span>Create New Leadership Administrator</span>
         </h3>
-        <button onclick="closeCreateUserModal()" class="text-zinc-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+        <button onclick="closeCreateUserModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white"><i class="fa-solid fa-xmark"></i></button>
       </div>
 
       <form onsubmit="handleCreateUser(event)" class="space-y-3 text-xs">
         <div>
-          <label class="block text-zinc-300 font-medium mb-1">Full Name</label>
-          <input type="text" id="new-user-fullname" required placeholder="e.g. Jane Doe" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-zinc-200 focus:outline-none focus:border-indigo-500">
+          <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1">Full Name</label>
+          <input type="text" id="new-user-fullname" required placeholder="e.g. Jane Doe" class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600">
         </div>
         <div>
-          <label class="block text-zinc-300 font-medium mb-1">Username</label>
-          <input type="text" id="new-user-username" required placeholder="e.g. jane.doe" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-zinc-200 mono focus:outline-none focus:border-indigo-500">
+          <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1">Username</label>
+          <input type="text" id="new-user-username" required placeholder="e.g. jane.doe" class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600">
         </div>
         <div>
-          <label class="block text-zinc-300 font-medium mb-1">Corporate Email</label>
-          <input type="email" id="new-user-email" required placeholder="e.g. jane@corp.internal" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-zinc-200 focus:outline-none focus:border-indigo-500">
+          <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1">Corporate Email</label>
+          <input type="email" id="new-user-email" required placeholder="e.g. jane@corp.internal" class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600">
         </div>
         <div>
-          <label class="block text-zinc-300 font-medium mb-1">Password (Complexity Enforced)</label>
-          <input type="password" id="new-user-password" required oninput="checkComplexity(this.value, 'new-user-rules')" placeholder="Min 10 chars, upper, lower, num, special" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-zinc-200 focus:outline-none focus:border-indigo-500">
-          <div id="new-user-rules" class="mt-2 p-2 rounded bg-zinc-900/80 border border-zinc-800 text-[10px] space-y-0.5 text-zinc-400">
+          <label class="block text-slate-700 dark:text-slate-300 font-medium mb-1">Password (Complexity Enforced)</label>
+          <input type="password" id="new-user-password" required oninput="checkComplexity(this.value, 'new-user-rules')" placeholder="Min 10 chars, upper, lower, num, special" class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600">
+          <div id="new-user-rules" class="mt-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-[10px] space-y-0.5 text-slate-500 dark:text-slate-400">
             <div>• Min 10 chars, uppercase, lowercase, number, special char.</div>
           </div>
         </div>
 
-        <div class="flex items-center justify-end space-x-2 pt-3 border-t border-zinc-800">
-          <button type="button" onclick="closeCreateUserModal()" class="px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300">Cancel</button>
-          <button type="submit" class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold">Create Leader</button>
+        <div class="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+          <button type="button" onclick="closeCreateUserModal()" class="px-3.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold">Create Leader</button>
         </div>
       </form>
     </div>
   </div>
 
   <!-- ADD PENTESTER MODAL -->
-  <div id="add-tester-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-    <div class="bg-surface-800 border border-zinc-700 rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
-      <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
-        <h3 class="text-sm font-bold text-white flex items-center space-x-2">
-          <i class="fa-solid fa-user-plus text-emerald-400"></i>
+  <div id="add-tester-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+          <i class="fa-solid fa-user-plus text-emerald-600 dark:text-emerald-400"></i>
           <span>Add Pentester Profile</span>
         </h3>
-        <button onclick="closeAddTesterModal()" class="text-zinc-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+        <button onclick="closeAddTesterModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white"><i class="fa-solid fa-xmark"></i></button>
       </div>
 
       <div class="space-y-3 text-xs">
         <div>
-          <label class="block text-zinc-300 mb-1 font-medium">Full Name:</label>
-          <input type="text" id="new-tester-name" placeholder="e.g. Marcus Vance" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-zinc-200 focus:outline-none focus:border-indigo-500">
+          <label class="block text-slate-700 dark:text-slate-300 mb-1 font-semibold">Full Name:</label>
+          <input type="text" id="new-tester-name" placeholder="e.g. Marcus Vance" class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600">
         </div>
         <div>
-          <label class="block text-zinc-300 mb-1 font-medium">Corporate Username:</label>
-          <input type="text" id="new-tester-username" placeholder="e.g. marcus.vance" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-zinc-200 focus:outline-none focus:border-indigo-500 mono">
+          <label class="block text-slate-700 dark:text-slate-300 mb-1 font-semibold">Corporate Username:</label>
+          <input type="text" id="new-tester-username" placeholder="e.g. marcus.vance" class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 mono">
         </div>
         <div>
-          <label class="block text-zinc-300 mb-1 font-medium">Corporate Email:</label>
-          <input type="email" id="new-tester-email" placeholder="e.g. marcus@corp.internal" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2.5 text-zinc-200 focus:outline-none focus:border-indigo-500">
+          <label class="block text-slate-700 dark:text-slate-300 mb-1 font-semibold">Corporate Email:</label>
+          <input type="email" id="new-tester-email" placeholder="e.g. marcus@corp.internal" class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600">
         </div>
       </div>
 
-      <div class="flex items-center justify-end space-x-2 pt-3 border-t border-zinc-800 text-xs">
-        <button onclick="closeAddTesterModal()" class="px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300">Cancel</button>
-        <button onclick="submitNewPentester()" class="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold">Generate API Key</button>
+      <div class="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
+        <button onclick="closeAddTesterModal()" class="px-3.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300">Cancel</button>
+        <button onclick="submitNewPentester()" class="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold">Generate API Key</button>
       </div>
     </div>
   </div>
 
   <!-- PAYLOAD INSPECTION MODAL -->
-  <div id="payload-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-    <div class="bg-surface-800 border border-zinc-700 rounded-xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl">
-      <div class="p-4 border-b border-zinc-800 flex items-center justify-between">
+  <div id="payload-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl">
+      <div class="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
         <div class="flex items-center space-x-3">
-          <span id="modal-method" class="px-2 py-0.5 rounded font-bold mono text-xs bg-indigo-900/60 text-indigo-300">GET</span>
-          <span id="modal-url" class="font-medium text-sm text-white mono truncate max-w-lg">https://...</span>
+          <span id="modal-method" class="px-2 py-0.5 rounded font-bold mono text-xs bg-indigo-50 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">GET</span>
+          <span id="modal-url" class="font-medium text-sm text-slate-900 dark:text-white mono truncate max-w-lg">https://...</span>
         </div>
-        <button onclick="closeModal()" class="text-zinc-400 hover:text-white p-1 rounded-lg"><i class="fa-solid fa-xmark text-lg"></i></button>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-lg"><i class="fa-solid fa-xmark text-lg"></i></button>
       </div>
 
       <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 overflow-y-auto">
         <div class="space-y-2 flex flex-col">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">HTTP Request</span>
-            <span id="modal-req-info" class="text-[11px] text-zinc-500 mono">0 bytes</span>
+            <span class="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">HTTP Request</span>
+            <span id="modal-req-info" class="text-[11px] text-slate-500 mono">0 bytes</span>
           </div>
-          <div class="bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-xs mono overflow-x-auto flex-1 max-h-96">
-            <div id="modal-req-headers" class="text-indigo-300 border-b border-zinc-800 pb-2 mb-2 whitespace-pre-wrap"></div>
-            <div id="modal-req-body" class="text-zinc-300 whitespace-pre-wrap"></div>
+          <div class="bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs mono overflow-x-auto flex-1 max-h-96 text-slate-200">
+            <div id="modal-req-headers" class="text-indigo-300 border-b border-slate-800 pb-2 mb-2 whitespace-pre-wrap"></div>
+            <div id="modal-req-body" class="text-slate-300 whitespace-pre-wrap"></div>
           </div>
         </div>
 
         <div class="space-y-2 flex flex-col">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold text-zinc-300 uppercase tracking-wider">HTTP Response</span>
-            <span id="modal-res-status" class="text-xs font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 mono">200 OK</span>
+            <span class="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">HTTP Response</span>
+            <span id="modal-res-status" class="text-xs font-bold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 mono">200 OK</span>
           </div>
-          <div class="bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-xs mono overflow-x-auto flex-1 max-h-96">
-            <div id="modal-res-headers" class="text-emerald-300 border-b border-zinc-800 pb-2 mb-2 whitespace-pre-wrap"></div>
-            <div id="modal-res-body" class="text-zinc-300 whitespace-pre-wrap"></div>
+          <div class="bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs mono overflow-x-auto flex-1 max-h-96 text-slate-200">
+            <div id="modal-res-headers" class="text-emerald-400 border-b border-slate-800 pb-2 mb-2 whitespace-pre-wrap"></div>
+            <div id="modal-res-body" class="text-slate-300 whitespace-pre-wrap"></div>
           </div>
         </div>
       </div>
 
-      <div class="p-3 border-t border-zinc-800 flex items-center justify-between text-xs text-zinc-400 bg-zinc-900/60 rounded-b-xl">
+      <div class="p-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 rounded-b-2xl">
         <div class="flex items-center space-x-4">
-          <span>Tester: <strong id="modal-tester" class="text-zinc-200"></strong></span>
-          <span>RITM: <strong id="modal-ritm" class="text-zinc-200"></strong></span>
-          <span>Tool: <strong id="modal-tool" class="text-zinc-200"></strong></span>
+          <span>Tester: <strong id="modal-tester" class="text-slate-800 dark:text-slate-200"></strong></span>
+          <span>RITM: <strong id="modal-ritm" class="text-slate-800 dark:text-slate-200"></strong></span>
+          <span>Tool: <strong id="modal-tool" class="text-slate-800 dark:text-slate-200"></strong></span>
         </div>
-        <button onclick="closeModal()" class="px-4 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white font-medium">Close</button>
+        <button onclick="closeModal()" class="px-4 py-1.5 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-white font-medium">Close</button>
       </div>
     </div>
   </div>
@@ -642,6 +654,35 @@
     const logsLimit = 25;
     let searchDebounceTimer = null;
 
+    // Theme Management (Defaults to Enterprise Light Mode)
+    function initTheme() {
+      const savedTheme = localStorage.getItem('swatcher_theme') || 'light';
+      applyTheme(savedTheme);
+    }
+
+    function applyTheme(theme) {
+      const html = document.documentElement;
+      const icon = document.getElementById('theme-icon');
+      const text = document.getElementById('theme-text');
+      if (theme === 'dark') {
+        html.classList.add('dark');
+        html.classList.remove('light');
+        if (icon) icon.className = 'fa-solid fa-sun text-amber-400';
+        if (text) text.innerText = 'Light Mode';
+      } else {
+        html.classList.remove('dark');
+        html.classList.add('light');
+        if (icon) icon.className = 'fa-solid fa-moon text-slate-600';
+        if (text) text.innerText = 'Dark Mode';
+      }
+      localStorage.setItem('swatcher_theme', theme);
+    }
+
+    function toggleTheme() {
+      const current = localStorage.getItem('swatcher_theme') || 'light';
+      applyTheme(current === 'dark' ? 'light' : 'dark');
+    }
+
     // Helper for authenticated requests
     function authHeaders() {
       return {
@@ -659,7 +700,7 @@
 
       const updateRule = (id, valid) => {
         const el = document.getElementById(id);
-        if (el) el.className = valid ? 'text-emerald-400 font-semibold' : 'text-zinc-500';
+        if (el) el.className = valid ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-slate-400 dark:text-slate-500';
       };
 
       if (containerId === 'setup-rules') {
@@ -673,6 +714,7 @@
 
     // Initial load check
     async function initApp() {
+      initTheme();
       try {
         const res = await fetch('/api/v1/auth/status', {
           headers: { 'x-session-token': sessionToken }
@@ -766,10 +808,10 @@
         const btn = document.getElementById(`tab-btn-${t}`);
         if (t === tab) {
           view.classList.remove('hidden');
-          if (btn) btn.className = 'tab-btn px-3 py-1.5 rounded-md font-medium text-white bg-zinc-700/60 transition';
+          if (btn) btn.className = 'tab-btn px-3 py-1.5 rounded-lg font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800/60 transition';
         } else {
           view.classList.add('hidden');
-          if (btn) btn.className = 'tab-btn px-3 py-1.5 rounded-md font-medium text-zinc-400 hover:text-white transition';
+          if (btn) btn.className = 'tab-btn px-3 py-1.5 rounded-lg font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition';
         }
       });
       document.getElementById('view-engagement-detail').classList.add('hidden');
@@ -825,22 +867,22 @@
       updateBatchRitmUI();
 
       if (currentEngagements.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-zinc-500">No pentest engagements found. Ingest traffic via Burp to populate.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-400 dark:text-slate-500">No pentest engagements found. Ingest traffic via Burp to populate.</td></tr>`;
         return;
       }
 
       currentEngagements.forEach(e => {
         const tr = document.createElement('tr');
-        tr.className = 'hover:bg-zinc-800/40 transition cursor-pointer';
+        tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-800/40 transition cursor-pointer text-slate-700 dark:text-slate-300';
 
         // Colored progress bar logic
-        let barColor = 'bg-indigo-500';
+        let barColor = 'bg-indigo-600';
         if (e.progress_status === 'OVER_BUDGET') barColor = 'bg-amber-500';
         else if (e.progress_status === 'ON_TARGET') barColor = 'bg-emerald-500';
 
         const testerBadges = e.testers.length > 0
-          ? e.testers.map(t => `<span class="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-zinc-200 text-[10px] mono"><i class="fa-solid fa-user-shield mr-1 text-indigo-400"></i>${t}</span>`).join(' ')
-          : '<span class="text-zinc-500 italic">None yet</span>';
+          ? e.testers.map(t => `<span class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-[10px] mono font-medium"><i class="fa-solid fa-user-shield mr-1 text-indigo-600 dark:text-indigo-400"></i>${t}</span>`).join(' ')
+          : '<span class="text-slate-400 italic">None yet</span>';
 
         tr.onclick = (evt) => {
           if (!evt.target.closest('input[type="checkbox"]') && !evt.target.closest('button')) {
@@ -850,34 +892,34 @@
 
         tr.innerHTML = `
           <td class="p-3">
-            <input type="checkbox" onchange="toggleSelectRitm('${e.ritm}', this.checked)" class="ritm-checkbox rounded bg-zinc-950 border-zinc-700" ${selectedRitms.has(e.ritm) ? 'checked' : ''}>
+            <input type="checkbox" onchange="toggleSelectRitm('${e.ritm}', this.checked)" class="ritm-checkbox rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" ${selectedRitms.has(e.ritm) ? 'checked' : ''}>
           </td>
           <td class="p-3">
-            <span class="px-2.5 py-1 rounded bg-zinc-900 border border-zinc-700 text-indigo-300 font-bold mono text-xs">${e.application_id}</span>
+            <span class="px-2.5 py-1 rounded-md bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 font-bold mono text-xs">${e.application_id}</span>
           </td>
-          <td class="p-3 mono font-bold text-white text-xs">${e.ritm}</td>
+          <td class="p-3 mono font-bold text-slate-900 dark:text-white text-xs">${e.ritm}</td>
           <td class="p-3">
             <div class="flex flex-wrap gap-1">${testerBadges}</div>
           </td>
           <td class="p-3">
             <div class="space-y-1">
               <div class="flex items-center justify-between text-[11px]">
-                <span class="text-zinc-300 font-medium">${e.active_hours}h / ${e.allocated_hours}h</span>
-                <span class="text-purple-400 font-bold mono">${e.pending_hours}h pending</span>
+                <span class="text-slate-700 dark:text-slate-300 font-medium">${e.active_hours}h / ${e.allocated_hours}h</span>
+                <span class="text-purple-600 dark:text-purple-400 font-bold mono">${e.pending_hours}h pending</span>
               </div>
-              <div class="w-full bg-zinc-900 rounded-full h-2 overflow-hidden border border-zinc-800">
+              <div class="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-200 dark:border-slate-700">
                 <div class="${barColor} h-full rounded-full transition-all duration-300" style="width: ${Math.min(100, e.completion_percentage)}%"></div>
               </div>
             </div>
           </td>
           <td class="p-3">
-            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${e.status === 'ACTIVE' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-zinc-900 text-zinc-400 border border-zinc-700'}">${e.status}</span>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${e.status === 'ACTIVE' ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'}">${e.status}</span>
           </td>
           <td class="p-3 text-right space-x-1">
-            <button onclick="openEngagementDetail('${e.ritm}')" class="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[11px] font-medium" title="Deep Dive View">
+            <button onclick="openEngagementDetail('${e.ritm}')" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-[11px] font-semibold" title="Deep Dive View">
               Inspect
             </button>
-            <button onclick="deleteSingleRitm('${e.ritm}')" class="p-1 px-2 rounded bg-zinc-800 hover:bg-rose-950/80 text-rose-400 hover:text-rose-300 transition" title="Delete Engagement">
+            <button onclick="deleteSingleRitm('${e.ritm}')" class="p-1 px-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950 text-rose-600 dark:text-rose-400 border border-slate-200 dark:border-slate-700 transition" title="Delete Engagement">
               <i class="fa-solid fa-trash-can text-xs"></i>
             </button>
           </td>
@@ -973,19 +1015,19 @@
         const testersContainer = document.getElementById('detail-testers-list');
         testersContainer.innerHTML = '';
         if (data.testers.length === 0) {
-          testersContainer.innerHTML = '<div class="text-zinc-500 italic">No tester traffic yet.</div>';
+          testersContainer.innerHTML = '<div class="text-slate-400 italic">No tester traffic yet.</div>';
         } else {
           data.testers.forEach(t => {
             const row = document.createElement('div');
-            row.className = 'p-2.5 rounded bg-zinc-900 border border-zinc-800 flex items-center justify-between';
+            row.className = 'p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between';
             row.innerHTML = `
               <div class="flex items-center space-x-2">
-                <span class="w-6 h-6 rounded-full bg-indigo-900 text-indigo-300 flex items-center justify-center font-bold text-[10px]">${t.username.charAt(0).toUpperCase()}</span>
-                <span class="mono font-semibold text-white">${t.username}</span>
+                <span class="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 flex items-center justify-center font-bold text-[10px]">${t.username.charAt(0).toUpperCase()}</span>
+                <span class="mono font-semibold text-slate-800 dark:text-slate-200">${t.username}</span>
               </div>
               <div class="flex items-center space-x-3 mono">
-                <span class="text-emerald-400 font-bold">${t.active_hours}h</span>
-                <span class="text-zinc-400">${t.request_count} reqs</span>
+                <span class="text-emerald-600 dark:text-emerald-400 font-bold">${t.active_hours}h</span>
+                <span class="text-slate-500">${t.request_count} reqs</span>
               </div>
             `;
             testersContainer.appendChild(row);
@@ -1001,10 +1043,10 @@
 
         data.tools.forEach(tool => {
           const row = document.createElement('div');
-          row.className = 'flex items-center justify-between p-2 rounded bg-zinc-900 border border-zinc-800';
+          row.className = 'flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700';
           row.innerHTML = `
-            <span class="mono font-bold text-zinc-300">${tool.tool}</span>
-            <span class="mono text-indigo-400">${tool.count} reqs (${Math.round((tool.count / (totalReqs || 1)) * 100)}%)</span>
+            <span class="mono font-bold text-slate-700 dark:text-slate-300">${tool.tool}</span>
+            <span class="mono font-semibold text-indigo-600 dark:text-indigo-400">${tool.count} reqs (${Math.round((tool.count / (totalReqs || 1)) * 100)}%)</span>
           `;
           toolsContainer.appendChild(row);
         });
@@ -1014,14 +1056,14 @@
         epTbody.innerHTML = '';
         data.endpoints.forEach(ep => {
           const tr = document.createElement('tr');
-          tr.className = 'hover:bg-zinc-800/40';
+          tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-700 dark:text-slate-300';
           tr.innerHTML = `
-            <td class="p-2 font-bold text-indigo-400">${ep.method}</td>
-            <td class="p-2 text-zinc-400">${ep.host}</td>
-            <td class="p-2 text-zinc-200 truncate max-w-xs">${ep.path}</td>
-            <td class="p-2 font-bold ${ep.status_code < 400 ? 'text-emerald-400' : 'text-amber-400'}">${ep.status_code}</td>
-            <td class="p-2 text-zinc-300">${ep.hits}</td>
-            <td class="p-2 text-zinc-500 text-[10px]">${new Date(ep.last_hit).toLocaleTimeString()}</td>
+            <td class="p-2 font-bold text-indigo-600 dark:text-indigo-400">${ep.method}</td>
+            <td class="p-2 text-slate-500">${ep.host}</td>
+            <td class="p-2 text-slate-800 dark:text-slate-200 truncate max-w-xs">${ep.path}</td>
+            <td class="p-2 font-bold ${ep.status_code < 400 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}">${ep.status_code}</td>
+            <td class="p-2 font-medium">${ep.hits}</td>
+            <td class="p-2 text-slate-400 text-[10px]">${new Date(ep.last_hit).toLocaleTimeString()}</td>
           `;
           epTbody.appendChild(tr);
         });
@@ -1048,51 +1090,51 @@
         updateBatchTesterUI();
 
         if (testers.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-zinc-500">No pentesters registered.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-slate-400 dark:text-slate-500">No pentesters registered.</td></tr>`;
           return;
         }
 
         testers.forEach(t => {
           const tr = document.createElement('tr');
-          tr.className = 'hover:bg-zinc-800/40 transition';
+          tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-800/40 transition text-slate-700 dark:text-slate-300';
 
           const statusBadge = t.is_active 
-            ? '<span class="px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 text-[10px] font-bold">ACTIVE</span>'
-            : '<span class="px-2 py-0.5 rounded-full bg-zinc-900 text-zinc-500 border border-zinc-700 text-[10px] font-bold">REVOKED</span>';
+            ? '<span class="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold">ACTIVE</span>'
+            : '<span class="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700 text-[10px] font-bold">REVOKED</span>';
 
           tr.innerHTML = `
             <td class="p-3.5">
-              <input type="checkbox" onchange="toggleSelectTester('${t.id}', this.checked)" class="tester-checkbox rounded bg-zinc-950 border-zinc-700" ${selectedTesters.has(t.id) ? 'checked' : ''}>
+              <input type="checkbox" onchange="toggleSelectTester('${t.id}', this.checked)" class="tester-checkbox rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" ${selectedTesters.has(t.id) ? 'checked' : ''}>
             </td>
-            <td class="p-3.5 font-bold text-white flex items-center space-x-2">
-              <div class="w-6 h-6 rounded-full bg-indigo-900/60 text-indigo-300 flex items-center justify-center font-bold text-[10px]">
+            <td class="p-3.5 font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+              <div class="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 flex items-center justify-center font-bold text-[10px]">
                 ${t.full_name.charAt(0).toUpperCase()}
               </div>
               <span>${t.full_name}</span>
             </td>
-            <td class="p-3.5 mono text-zinc-300">
-              <div>${t.username}</div>
-              <div class="text-[11px] text-zinc-500">${t.email || ''}</div>
+            <td class="p-3.5 mono">
+              <div class="text-slate-800 dark:text-slate-200 font-medium">${t.username}</div>
+              <div class="text-[11px] text-slate-500">${t.email || ''}</div>
             </td>
             <td class="p-3.5">
               <div class="flex items-center space-x-1.5">
-                <input type="password" value="${t.api_key}" readonly id="key-${t.id}" class="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-[11px] mono text-zinc-300 w-36 select-all focus:outline-none">
-                <button onclick="toggleKeyVisibility('${t.id}')" class="p-1 text-zinc-400 hover:text-white" title="Toggle Visibility">
+                <input type="password" value="${t.api_key}" readonly id="key-${t.id}" class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-2 py-1 text-[11px] mono text-slate-700 dark:text-slate-300 w-36 select-all focus:outline-none">
+                <button onclick="toggleKeyVisibility('${t.id}')" class="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white" title="Toggle Visibility">
                   <i class="fa-solid fa-eye text-xs"></i>
                 </button>
-                <button onclick="copyToClipboard('${t.api_key}', 'API Key copied!')" class="p-1 px-2 rounded bg-indigo-950 hover:bg-indigo-900 text-indigo-300 border border-indigo-800 text-[10px] font-semibold">
+                <button onclick="copyToClipboard('${t.api_key}', 'API Key copied!')" class="p-1 px-2.5 rounded-md bg-indigo-50 dark:bg-indigo-950 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[10px] font-semibold">
                   <i class="fa-regular fa-copy mr-1"></i> Copy
                 </button>
               </div>
             </td>
             <td class="p-3.5">${statusBadge}</td>
-            <td class="p-3.5 mono text-zinc-200 font-semibold">${t.total_engagements}</td>
-            <td class="p-3.5 mono text-zinc-400">${Number(t.total_requests).toLocaleString()}</td>
-            <td class="p-3.5 text-right space-x-2">
-              <button onclick="togglePentesterStatus('${t.id}')" class="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px]">
+            <td class="p-3.5 mono text-slate-800 dark:text-slate-200 font-semibold">${t.total_engagements}</td>
+            <td class="p-3.5 mono text-slate-500">${Number(t.total_requests).toLocaleString()}</td>
+            <td class="p-3.5 text-right space-x-1">
+              <button onclick="togglePentesterStatus('${t.id}')" class="px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[10px] font-medium">
                 ${t.is_active ? 'Revoke' : 'Activate'}
               </button>
-              <button onclick="deleteSingleTester('${t.id}', '${t.username}')" class="p-1 px-2 rounded bg-zinc-800 hover:bg-rose-950 text-rose-400" title="Delete Pentester">
+              <button onclick="deleteSingleTester('${t.id}', '${t.username}')" class="p-1 px-2 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950 text-rose-600 dark:text-rose-400 border border-slate-200 dark:border-slate-700" title="Delete Pentester">
                 <i class="fa-solid fa-trash-can text-xs"></i>
               </button>
             </td>
@@ -1215,31 +1257,31 @@
         tbody.innerHTML = '';
 
         if (logs.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-zinc-500">No audit events logged yet.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-400 dark:text-slate-500">No audit events logged yet.</td></tr>`;
           return;
         }
 
         logs.forEach(l => {
           const tr = document.createElement('tr');
-          tr.className = 'hover:bg-zinc-800/40 text-[11px]';
+          tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-800/40 text-[11px] text-slate-700 dark:text-slate-300';
 
-          let actionBadge = 'bg-zinc-800 text-zinc-300';
-          if (l.action_type.includes('DELETE')) actionBadge = 'bg-rose-950 text-rose-300 border border-rose-800';
-          else if (l.action_type.includes('CREATE') || l.action_type.includes('SETUP')) actionBadge = 'bg-emerald-950 text-emerald-300 border border-emerald-800';
-          else if (l.action_type.includes('LOGIN')) actionBadge = 'bg-indigo-950 text-indigo-300 border border-indigo-800';
+          let actionBadge = 'bg-slate-100 text-slate-700 border border-slate-200';
+          if (l.action_type.includes('DELETE')) actionBadge = 'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800';
+          else if (l.action_type.includes('CREATE') || l.action_type.includes('SETUP')) actionBadge = 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800';
+          else if (l.action_type.includes('LOGIN')) actionBadge = 'bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950 dark:text-indigo-300 dark:border-indigo-800';
 
           const durationStr = l.duration_seconds !== null && l.duration_seconds !== undefined
             ? `${Math.floor(l.duration_seconds / 60)}m ${l.duration_seconds % 60}s`
             : '-';
 
           tr.innerHTML = `
-            <td class="p-3 mono text-zinc-400 whitespace-nowrap">${new Date(l.created_at).toLocaleString()}</td>
-            <td class="p-3 mono font-bold text-white">${l.username}</td>
+            <td class="p-3 mono text-slate-500 whitespace-nowrap">${new Date(l.created_at).toLocaleString()}</td>
+            <td class="p-3 mono font-bold text-slate-900 dark:text-white">${l.username}</td>
             <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${actionBadge} mono">${l.action_type}</span></td>
-            <td class="p-3 mono text-indigo-400 font-medium">${l.target_id || l.target_name || '-'}</td>
-            <td class="p-3 text-zinc-300 max-w-sm">${l.description}</td>
-            <td class="p-3 mono text-zinc-400">${durationStr}</td>
-            <td class="p-3 mono text-zinc-500">${l.ip_address}</td>
+            <td class="p-3 mono text-indigo-600 dark:text-indigo-400 font-semibold">${l.target_id || l.target_name || '-'}</td>
+            <td class="p-3 text-slate-600 dark:text-slate-300 max-w-sm">${l.description}</td>
+            <td class="p-3 mono text-slate-500">${durationStr}</td>
+            <td class="p-3 mono text-slate-400">${l.ip_address}</td>
           `;
           tbody.appendChild(tr);
         });
@@ -1302,7 +1344,7 @@
         tbody.innerHTML = '';
 
         if (!data.logs || data.logs.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="9" class="p-6 text-center text-zinc-500">No logs matching filter.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="9" class="p-6 text-center text-slate-400 dark:text-slate-500">No logs matching filter.</td></tr>`;
           document.getElementById('logs-pagination-info').innerText = '0 logs';
           return;
         }
@@ -1313,20 +1355,20 @@
 
         data.logs.forEach(log => {
           const tr = document.createElement('tr');
-          tr.className = 'hover:bg-zinc-800/40 transition cursor-pointer';
+          tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-800/40 transition cursor-pointer text-slate-700 dark:text-slate-300';
           tr.onclick = (e) => { if (!e.target.closest('button')) openLogDetail(log.id); };
 
           tr.innerHTML = `
-            <td class="p-3 text-zinc-400 mono text-[11px] whitespace-nowrap">${new Date(log.timestamp).toLocaleTimeString()}</td>
-            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-semibold border mono bg-zinc-900 border-zinc-700">${log.tool}</span></td>
-            <td class="p-3 mono font-medium text-zinc-300">${log.ritm}</td>
-            <td class="p-3 mono text-zinc-400">${log.tester_username}</td>
-            <td class="p-3 mono font-bold text-indigo-400">${log.method}</td>
-            <td class="p-3 mono text-zinc-200 truncate max-w-xs" title="${log.url}">${log.path || '/'}</td>
-            <td class="p-3 mono font-bold ${log.status_code < 400 ? 'text-emerald-400' : 'text-amber-400'}">${log.status_code}</td>
-            <td class="p-3 mono text-zinc-400">${log.duration_ms}ms</td>
+            <td class="p-3 text-slate-500 mono text-[11px] whitespace-nowrap">${new Date(log.timestamp).toLocaleTimeString()}</td>
+            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-semibold border mono bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700">${log.tool}</span></td>
+            <td class="p-3 mono font-medium text-slate-800 dark:text-slate-200">${log.ritm}</td>
+            <td class="p-3 mono text-slate-500">${log.tester_username}</td>
+            <td class="p-3 mono font-bold text-indigo-600 dark:text-indigo-400">${log.method}</td>
+            <td class="p-3 mono text-slate-800 dark:text-slate-200 truncate max-w-xs" title="${log.url}">${log.path || '/'}</td>
+            <td class="p-3 mono font-bold ${log.status_code < 400 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}">${log.status_code}</td>
+            <td class="p-3 mono text-slate-500">${log.duration_ms}ms</td>
             <td class="p-3 text-right">
-              <button onclick="openLogDetail(${log.id})" class="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[11px]">Inspect</button>
+              <button onclick="openLogDetail(${log.id})" class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-[11px] font-semibold">Inspect</button>
             </td>
           `;
           tbody.appendChild(tr);
