@@ -38,6 +38,10 @@ target/
 !gradle/wrapper/gradle-wrapper.jar
 !swatcher-extension/gradle/wrapper/gradle-wrapper.jar
 
+# Pre-built Release Binary Artifacts
+!release/
+!release/*.jar
+
 # Burp Suite Engagement Files & Temporary Captures
 *.burp
 *.burp.*
