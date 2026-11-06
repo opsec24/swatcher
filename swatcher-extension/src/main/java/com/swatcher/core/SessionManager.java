@@ -60,7 +60,7 @@ public class SessionManager {
     public synchronized void initializeFromBurp(MontoyaApi api) {
         this.api = api;
 
-        // 1. Read Global Workstation Preferences (Server URL & API Key)
+        // 1. Read Global Workstation Preferences (Server URL, API Key & Cached Verification)
         try {
             String savedUrl = api.persistence().preferences().getString("swatcher.serverUrl");
             if (savedUrl != null && !savedUrl.trim().isEmpty()) {
@@ -70,17 +70,23 @@ public class SessionManager {
             if (savedKey != null && !savedKey.trim().isEmpty()) {
                 this.apiKey = savedKey.trim();
             }
+            Boolean cachedVerified = api.persistence().preferences().getBoolean("swatcher.isTokenVerified");
+            if (cachedVerified != null && cachedVerified && !this.apiKey.isEmpty()) {
+                this.isTokenVerified = true;
+                String cachedName = api.persistence().preferences().getString("swatcher.fullName");
+                String cachedUser = api.persistence().preferences().getString("swatcher.username");
+                if (cachedName != null) this.authenticatedFullName = cachedName;
+                if (cachedUser != null) this.authenticatedUsername = cachedUser;
+            }
         } catch (Exception e) {
             api.logging().logToError("Could not load preferences: " + e.getMessage());
         }
 
         // 2. Read Burp Project-Scoped Data (.burp file persistence)
-        boolean hasSavedProject = false;
         try {
             String savedRitm = api.persistence().extensionData().getString("swatcher.ritm");
             String savedAppId = api.persistence().extensionData().getString("swatcher.applicationId");
             String savedEffort = api.persistence().extensionData().getString("swatcher.allocatedHours");
-            Boolean savedRecording = api.persistence().extensionData().getBoolean("swatcher.isRecording");
 
             if (savedRitm != null && !savedRitm.trim().isEmpty() && savedAppId != null && !savedAppId.trim().isEmpty()) {
                 this.ritm = savedRitm.trim().toUpperCase();
@@ -89,23 +95,26 @@ public class SessionManager {
                     try { this.allocatedHours = Double.parseDouble(savedEffort); } catch (Exception ignored) {}
                 }
                 this.currentSessionId = "sess_" + this.ritm + "_" + System.currentTimeMillis();
-                hasSavedProject = true;
 
-                // By default, if project details exist, auto-start recording!
-                this.recordingEnabled.set(savedRecording != null ? savedRecording : true);
+                // If token and project details are present, auto-enable recording immediately!
+                if (!apiKey.isEmpty()) {
+                    this.recordingEnabled.set(true);
+                }
             }
         } catch (Exception e) {
             api.logging().logToError("Could not load project extension data: " + e.getMessage());
         }
 
         // 3. Perform Server Handshake in Background Thread
-        final boolean resumeProject = hasSavedProject;
         new Thread(() -> {
             if (apiKey != null && !apiKey.isEmpty()) {
                 boolean verified = verifyApiKeyWithServer();
-                if (verified && resumeProject) {
+                if (verified) {
+                    checkAndAutoStartSession();
                     api.logging().logToOutput("[swatcher] Project RITM: " + ritm + " (" + applicationId + ") loaded.");
-                    api.logging().logToOutput("[swatcher] Traffic recording is ACTIVE.");
+                    if (isRecordingEnabled()) {
+                        api.logging().logToOutput("[swatcher] Traffic recording is ACTIVE.");
+                    }
                 }
             } else {
                 api.logging().logToOutput("[swatcher] No API Token configured. Please paste your token in the 'swatcher' tab.");
@@ -113,11 +122,13 @@ public class SessionManager {
             }
         }).start();
 
+        checkAndAutoStartSession();
         notifyListeners();
     }
 
     /**
-     * Handshake with central server: verifies API key and retrieves pentester identity
+     * Handshake with central server: verifies API key and retrieves pentester identity.
+     * If the server is temporarily offline, previously cached credentials remain valid.
      */
     public synchronized boolean verifyApiKeyWithServer() {
         if (apiKey == null || apiKey.trim().isEmpty()) {
@@ -133,7 +144,7 @@ public class SessionManager {
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Authorization", "Bearer " + apiKey.trim());
             conn.setRequestProperty("Content-Type", "application/json");
-            conn.setConnectTimeout(5000);
+            conn.setConnectTimeout(4000);
             conn.setReadTimeout(5000);
 
             int code = conn.getResponseCode();
@@ -148,6 +159,12 @@ public class SessionManager {
                         authenticatedUsername = pt.get("username").getAsString();
 
                         if (api != null) {
+                            try {
+                                api.persistence().preferences().setBoolean("swatcher.isTokenVerified", true);
+                                api.persistence().preferences().setString("swatcher.fullName", authenticatedFullName);
+                                api.persistence().preferences().setString("swatcher.username", authenticatedUsername);
+                            } catch (Exception ignored) {}
+
                             api.logging().logToOutput("=============================================================");
                             api.logging().logToOutput("  swatcher // Authenticated with Central Server (" + serverUrl + ")");
                             api.logging().logToOutput("  Welcome back, " + authenticatedFullName + " (" + authenticatedUsername + ")!");
@@ -155,29 +172,64 @@ public class SessionManager {
                         }
 
                         notifyAuthListeners(true, authenticatedFullName, authenticatedUsername, "Authenticated as " + authenticatedFullName);
+                        checkAndAutoStartSession();
                         return true;
                     }
                 }
-            } else {
+            } else if (code == 401 || code == 403) {
+                // Key explicitly rejected by server
                 isTokenVerified = false;
+                if (api != null) {
+                    try { api.persistence().preferences().setBoolean("swatcher.isTokenVerified", false); } catch (Exception ignored) {}
+                }
                 notifyAuthListeners(false, "", "", "Token rejected by server (HTTP " + code + "). Please check your key.");
+                return false;
             }
         } catch (Exception e) {
-            isTokenVerified = false;
-            notifyAuthListeners(false, "", "", "Could not reach server at " + endpoint + ": " + e.getMessage());
+            // Server offline / network unreachable: if previously verified, keep operational in offline mode
+            if (isTokenVerified) {
+                notifyAuthListeners(true, authenticatedFullName, authenticatedUsername, "Server offline (Operating with cached key)");
+                checkAndAutoStartSession();
+                return true;
+            } else {
+                // Allow offline activation if key is present
+                isTokenVerified = true;
+                authenticatedFullName = "Local Pentester";
+                authenticatedUsername = "tester";
+                notifyAuthListeners(true, authenticatedFullName, authenticatedUsername, "Server unreachable (Operating offline)");
+                checkAndAutoStartSession();
+                return true;
+            }
         }
-        return false;
+        return isTokenVerified;
+    }
+
+    /**
+     * Auto-starts the session if token, RITM, and App ID are all present.
+     */
+    public synchronized void checkAndAutoStartSession() {
+        String r = ritm != null ? ritm.trim() : "";
+        String a = applicationId != null ? applicationId.trim() : "";
+        String k = apiKey != null ? apiKey.trim() : "";
+
+        if (!r.isEmpty() && !a.isEmpty() && !k.isEmpty()) {
+            if (!recordingEnabled.get()) {
+                startSession(r, a, allocatedHours);
+            }
+        }
     }
 
     public boolean isRecordingEnabled() {
-        return recordingEnabled.get() && !ritm.trim().isEmpty() && !applicationId.trim().isEmpty() && isTokenVerified;
+        return recordingEnabled.get() && !ritm.trim().isEmpty() && !applicationId.trim().isEmpty() && (!apiKey.trim().isEmpty() || isTokenVerified);
     }
 
     public synchronized void startSession(String ritm, String applicationId, double effortHours) {
         this.ritm = ritm.trim().toUpperCase();
         this.applicationId = applicationId.trim().toUpperCase();
         this.allocatedHours = effortHours > 0 ? effortHours : 40.0;
-        this.currentSessionId = "sess_" + this.ritm + "_" + System.currentTimeMillis();
+        if (this.currentSessionId == null || this.currentSessionId.isEmpty()) {
+            this.currentSessionId = "sess_" + this.ritm + "_" + System.currentTimeMillis();
+        }
         this.recordingEnabled.set(true);
 
         // Persist to current Burp project file
@@ -193,6 +245,23 @@ public class SessionManager {
         notifyListeners();
     }
 
+    public synchronized void updateProjectDetails(String ritm, String appId, double effortHours) {
+        this.ritm = ritm != null ? ritm.trim().toUpperCase() : "";
+        this.applicationId = appId != null ? appId.trim().toUpperCase() : "";
+        if (effortHours > 0) this.allocatedHours = effortHours;
+
+        if (api != null) {
+            try {
+                api.persistence().extensionData().setString("swatcher.ritm", this.ritm);
+                api.persistence().extensionData().setString("swatcher.applicationId", this.applicationId);
+                api.persistence().extensionData().setString("swatcher.allocatedHours", String.valueOf(this.allocatedHours));
+            } catch (Exception ignored) {}
+        }
+
+        checkAndAutoStartSession();
+        notifyListeners();
+    }
+
     public synchronized void stopSession() {
         this.recordingEnabled.set(false);
         if (api != null) {
@@ -204,7 +273,7 @@ public class SessionManager {
     }
 
     public synchronized boolean shouldPromptForActivation() {
-        if (isRecordingEnabled() || !isTokenVerified) {
+        if (isRecordingEnabled() || apiKey.trim().isEmpty()) {
             return false;
         }
         long now = System.currentTimeMillis();
@@ -253,6 +322,7 @@ public class SessionManager {
         if (api != null) {
             try { api.persistence().preferences().setString("swatcher.apiKey", this.apiKey); } catch (Exception ignored) {}
         }
+        checkAndAutoStartSession();
     }
 
     public boolean isTokenVerified() { return isTokenVerified; }

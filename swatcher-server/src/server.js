@@ -22,6 +22,7 @@ app.use(helmet({
         "https://cdn.jsdelivr.net",
         "https://cdnjs.cloudflare.com"
       ],
+      scriptSrcAttr: ["'unsafe-inline'"],
       styleSrc: [
         "'self'",
         "'unsafe-inline'",
@@ -34,9 +35,11 @@ app.use(helmet({
         "https://cdnjs.cloudflare.com"
       ],
       imgSrc: ["'self'", "data:"],
-      connectSrc: ["'self'"]
+      connectSrc: ["'self'"],
+      upgradeInsecureRequests: null
     }
   },
+  hsts: false,
   crossOriginEmbedderPolicy: false
 }));
 

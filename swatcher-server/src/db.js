@@ -92,7 +92,7 @@ const db = {
       CREATE TABLE IF NOT EXISTS audit_logs (
         id SERIAL PRIMARY KEY,
         session_id VARCHAR(128),
-        user_id VARCHAR(64) NOT NULL,
+        user_id VARCHAR(64) DEFAULT 'SYSTEM',
         username VARCHAR(64) NOT NULL,
         action_type VARCHAR(64) NOT NULL,
         target_id VARCHAR(128) DEFAULT '',
@@ -102,6 +102,9 @@ const db = {
         ip_address VARCHAR(64),
         created_at VARCHAR(64) NOT NULL
       );
+
+      -- Idempotent schema migration to allow system-level unauthenticated audit events
+      ALTER TABLE audit_logs ALTER COLUMN user_id DROP NOT NULL;
 
       CREATE TABLE IF NOT EXISTS pentesters (
         id VARCHAR(64) PRIMARY KEY,

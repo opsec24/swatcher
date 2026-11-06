@@ -5,6 +5,8 @@ import com.swatcher.core.TrafficDispatcher;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 
@@ -125,8 +127,8 @@ public class SwatcherTab extends JPanel {
 
         bufferedLabel = new JLabel("Buffered: 0", SwingConstants.CENTER);
         uploadedLabel = new JLabel("Uploaded: 0", SwingConstants.CENTER);
-        failedLabel = new JLabel("Failed: 0", SwingConstants.CENTER);
-        backlogLabel = new JLabel("Queue Backlog: 0", SwingConstants.CENTER);
+        failedLabel = new JLabel("Offline Store: 0", SwingConstants.CENTER);
+        backlogLabel = new JLabel("Active Queue: 0", SwingConstants.CENTER);
 
         statsPanel.add(bufferedLabel);
         statsPanel.add(uploadedLabel);
@@ -147,6 +149,33 @@ public class SwatcherTab extends JPanel {
         scrollPane.setBorder(BorderFactory.createTitledBorder("Live Monitored Traffic Feed"));
         add(scrollPane, BorderLayout.CENTER);
 
+        // Automatic Auto-Enable DocumentListener
+        DocumentListener autoEnableListener = new DocumentListener() {
+            private void triggerAutoCheck() {
+                String r = ritmField.getText().trim();
+                String a = appIdField.getText().trim();
+                String k = new String(apiKeyField.getPassword()).trim();
+                double effort = 40.0;
+                try { effort = Double.parseDouble(effortField.getText().trim()); } catch (Exception ignored) {}
+
+                if (!k.isEmpty()) {
+                    SessionManager.getInstance().setApiKey(k);
+                }
+                if (!r.isEmpty() && !a.isEmpty()) {
+                    SessionManager.getInstance().updateProjectDetails(r, a, effort);
+                }
+                updateStatusLabel();
+            }
+
+            @Override public void insertUpdate(DocumentEvent e) { triggerAutoCheck(); }
+            @Override public void removeUpdate(DocumentEvent e) { triggerAutoCheck(); }
+            @Override public void changedUpdate(DocumentEvent e) { triggerAutoCheck(); }
+        };
+
+        ritmField.getDocument().addDocumentListener(autoEnableListener);
+        appIdField.getDocument().addDocumentListener(autoEnableListener);
+        apiKeyField.getDocument().addDocumentListener(autoEnableListener);
+
         // Wire session manager listeners
         SessionManager.getInstance().addListener(new SessionManager.SessionStateListener() {
             @Override
@@ -160,14 +189,17 @@ public class SwatcherTab extends JPanel {
             }
         });
 
-        TrafficDispatcher.getInstance().addStatsListener((buffered, uploaded, failed, backlog) -> {
+        TrafficDispatcher.getInstance().addStatsListener((buffered, uploaded, failed, queueSize, offlineCount, isServerOnline) -> {
             SwingUtilities.invokeLater(() -> {
                 bufferedLabel.setText("Buffered: " + buffered);
                 uploadedLabel.setText("Uploaded: " + uploaded);
-                failedLabel.setText("Failed: " + failed);
-                backlogLabel.setText("Queue Backlog: " + backlog);
+                failedLabel.setText("Offline Store: " + offlineCount);
+                backlogLabel.setText("Active Queue: " + queueSize);
+                updateStatusLabel();
             });
         });
+
+        updateStatusLabel();
     }
 
     private void handleVerifyAndSaveKey() {
@@ -200,6 +232,7 @@ public class SwatcherTab extends JPanel {
                             "API Token verification failed.\nPlease ensure your Swatcher server is running at " + url + " and your key is active.",
                             "Authentication Failed", JOptionPane.ERROR_MESSAGE);
                 }
+                updateStatusLabel();
             });
         }).start();
     }
@@ -227,6 +260,7 @@ public class SwatcherTab extends JPanel {
             SessionManager.getInstance().setApiKey(token);
             SessionManager.getInstance().startSession(ritm, appId, effort);
         }
+        updateStatusLabel();
     }
 
     private void updateAuthUI(boolean isVerified, String fullName, String username, String message) {
@@ -235,25 +269,45 @@ public class SwatcherTab extends JPanel {
         } else {
             welcomeLabel.setText("<html><span style='color:#f59e0b;'>⚠️ " + message + "</span></html>");
         }
+        updateStatusLabel();
     }
 
     private void updateSessionUI(boolean isRecording, String ritm, String appId, double effort) {
-        ritmField.setText(ritm);
-        appIdField.setText(appId);
-        effortField.setText(String.valueOf((int) effort));
-        serverUrlField.setText(SessionManager.getInstance().getServerUrl());
-        apiKeyField.setText(SessionManager.getInstance().getApiKey());
+        if (!ritmField.hasFocus()) ritmField.setText(ritm);
+        if (!appIdField.hasFocus()) appIdField.setText(appId);
+        if (!effortField.hasFocus()) effortField.setText(String.valueOf((int) effort));
+        if (!serverUrlField.hasFocus()) serverUrlField.setText(SessionManager.getInstance().getServerUrl());
+        if (!apiKeyField.hasFocus()) apiKeyField.setText(SessionManager.getInstance().getApiKey());
 
-        if (isRecording) {
-            statusLabel.setText("STATUS: RECORDING (" + ritm + " / " + appId + " [" + (int) effort + "h])");
-            statusLabel.setForeground(new Color(34, 197, 94));
-            toggleBtn.setText("Pause Recording");
-            toggleBtn.setBackground(new Color(239, 68, 68));
-        } else {
+        updateStatusLabel();
+    }
+
+    private void updateStatusLabel() {
+        boolean recording = SessionManager.getInstance().isRecordingEnabled();
+        boolean online = TrafficDispatcher.getInstance().isServerOnline();
+        long offline = TrafficDispatcher.getInstance().getOfflineCount();
+        String ritm = SessionManager.getInstance().getRitm();
+        String appId = SessionManager.getInstance().getApplicationId();
+
+        if (!recording) {
             statusLabel.setText("STATUS: PAUSED");
-            statusLabel.setForeground(new Color(239, 68, 68));
+            statusLabel.setForeground(new Color(239, 68, 68)); // Red
             toggleBtn.setText("Start Recording Session");
-            toggleBtn.setBackground(new Color(34, 197, 94));
+            toggleBtn.setBackground(new Color(34, 197, 94)); // Green
+            toggleBtn.setForeground(Color.BLACK);
+        } else if (!online || offline > 0) {
+            String countNote = offline > 0 ? " (" + offline + " queued locally)" : "";
+            statusLabel.setText("STATUS: SAVING OFFLINE - Server Offline" + countNote);
+            statusLabel.setForeground(new Color(245, 158, 11)); // Amber
+            toggleBtn.setText("Pause Recording");
+            toggleBtn.setBackground(new Color(239, 68, 68)); // Red
+            toggleBtn.setForeground(Color.WHITE);
+        } else {
+            statusLabel.setText("STATUS: RECORDING (LIVE - " + ritm + " / " + appId + ")");
+            statusLabel.setForeground(new Color(34, 197, 94)); // Green
+            toggleBtn.setText("Pause Recording");
+            toggleBtn.setBackground(new Color(239, 68, 68)); // Red
+            toggleBtn.setForeground(Color.WHITE);
         }
     }
 

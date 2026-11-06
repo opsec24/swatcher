@@ -73,10 +73,10 @@ public class ActivationModal {
                 double effort = 40.0;
                 try { effort = Double.parseDouble(effortField.getText().trim()); } catch (Exception ignored) {}
 
-                if (!SessionManager.getInstance().isTokenVerified()) {
+                if (SessionManager.getInstance().getApiKey().isEmpty()) {
                     JOptionPane.showMessageDialog(dialog,
-                            "Your Swatcher API Key is not configured or verified.\n"
-                            + "Please open the 'swatcher' tab in Burp Suite and verify your API token first.",
+                            "Your Swatcher API Key is not configured.\n"
+                            + "Please open the 'swatcher' tab in Burp Suite and set your API token.",
                             "API Key Required", JOptionPane.WARNING_MESSAGE);
                     dialog.dispose();
                     return;
