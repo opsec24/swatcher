@@ -274,12 +274,11 @@ public class TrafficDispatcher {
             }
             byte[] compressedBytes = baos.toByteArray();
 
-            URL url = new URL(endpoint);
-            conn = (HttpURLConnection) url.openConnection();
+            conn = NetworkClient.openConnection(endpoint);
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
             conn.setRequestProperty("Content-Encoding", "gzip");
-            conn.setRequestProperty("User-Agent", "swatcher-burp-plugin/1.1.0");
+            conn.setRequestProperty("User-Agent", "swatcher-burp-plugin/1.2.0");
 
             if (apiKey != null && !apiKey.isEmpty()) {
                 conn.setRequestProperty("Authorization", "Bearer " + apiKey);
@@ -366,5 +365,11 @@ public class TrafficDispatcher {
     public void shutdown() {
         this.running = false;
         this.workerThread.interrupt();
+        // Drain any un-flushed in-memory events to the offline store so no traffic is lost on unload
+        List<TrafficEvent> remaining = new ArrayList<>();
+        queue.drainTo(remaining);
+        if (!remaining.isEmpty()) {
+            offlineQueue.appendEvents(remaining);
+        }
     }
 }

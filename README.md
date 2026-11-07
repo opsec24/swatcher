@@ -6,9 +6,13 @@
 2. **Effort & Progress Tracking:** Real-time progress bars showing active testing hours completed vs budgeted effort (e.g., 28 / 40 hrs).
 3. **True Proof-of-Work:** Intelligently separates deep **Manual Testing** (Repeater/Proxy) from **Automated Scans** (Scanner/Intruder).
 4. **Append-Only Multi-Tester Collaboration:** Multiple pentesters can work on the same `RITM` simultaneously without overwriting data.
-5. **Zero-Friction Project Persistence:** Details saved directly into the Burp `.burp` project file. Open an existing project and it **auto-resumes recording silently**!
-6. **Enterprise Token Security:** Ingestion requests authenticate with cryptographically random API tokens (`Bearer sw_live_...`). Pentester identity is derived server-side to prevent header spoofing.
-7. **Production Grade:** Built on **PostgreSQL 16** with enterprise connection pooling, persistent storage volumes, and high-throughput indexes.
+5. **Enterprise CA & Proxy Integration:** Built-in compatibility with corporate inspection proxies (McAfee Web Gateway, Skyhigh, Zscaler, BlueCoat) and internal enterprise PKIs with forward proxy routing.
+6. **Immunity & Scaffolding Exclusion:** Automatically exempts self-traffic, Burp Collaborator/OAST domains (`*.burpcollaborator.net`, `*.oastify.com`, `*.interactsh.com`), and loopback addresses to eliminate feedback loops.
+7. **Offline Queue & Replay:** Buffers traffic locally to an encrypted/safe disk queue when central server is unreachable, automatically draining when connection resumes.
+8. **Air-Gapped Ready:** Central leadership dashboard is 100% self-contained with offline vendor assets (Chart.js, Tailwind, FontAwesome) and strict defensive CSP.
+9. **Zero-Friction Project Persistence:** Details saved directly into the Burp `.burp` project file. Open an existing project and it **auto-resumes recording silently**!
+10. **Enterprise Token Security:** Ingestion requests authenticate with cryptographically random API tokens (`Bearer sw_live_...`). Pentester identity is derived server-side to prevent header spoofing.
+11. **Production Grade:** Built on **PostgreSQL 16** with enterprise connection pooling, persistent storage volumes, and high-throughput indexes.
 
 ---
 
@@ -114,20 +118,22 @@ chmod +x run.sh
 ```bash
 cd swatcher-extension
 ./gradlew jar
-# Produces: swatcher-extension/build/libs/swatcher-1.0.0.jar
+# Produces: release/swatcher-1.2.0.jar (or swatcher-extension/build/libs/swatcher-1.2.0.jar)
 ```
 
 ### 2. Install in Burp Suite
 1. In Burp Suite Pro, navigate to **Extensions** -> **Installed** -> **Add**.
-2. Select **Extension type: Java** and choose `swatcher-1.0.0.jar`.
+2. Select **Extension type: Java** and choose `release/swatcher-1.2.0.jar`.
 3. On first launch:
-   - Enter Central Server URL: `http://<EC2-PUBLIC-IP>:9090` (or your domain with HTTPS).
+   - Enter Central Server URL: `http://<EC2-PUBLIC-IP>:9090` (or `https://...`).
    - Enter your assigned API Key: `sw_live_...`.
-   - The extension performs a cryptographic handshake with the server and displays:
+   - (Optional) Configure **Corporate Proxy** (e.g. `proxy.corp.internal:8080`) if your organization routes traffic through McAfee, Skyhigh, or Zscaler.
+   - (Optional) Ensure **Trust Enterprise CAs** is checked if your enterprise uses custom internal TLS decryption.
+   - Click **Verify & Save Token**. The extension displays:
      ```
      [swatcher] Welcome back, <Pentester Name>! Connection established.
      ```
-4. The API key is stored **once** globally on the workstation in Burp preferences.
+4. The API key and enterprise settings are stored **once** globally on the workstation in Burp preferences.
 
 ### 3. Engagement Workflow
 * **New Project:** When opening a new Burp project file, the extension prompts for:

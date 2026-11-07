@@ -36,6 +36,19 @@ public class SwatcherHttpHandler implements HttpHandler {
             ".zip", ".tar", ".gz", ".7z", ".rar", ".iso", ".exe", ".dmg", ".pdf"
     ));
 
+    private static final Set<String> OAST_DOMAINS = new HashSet<>(Arrays.asList(
+            "burpcollaborator.net",
+            "oastify.com",
+            "oast.pro",
+            "oast.live",
+            "oast.site",
+            "oast.online",
+            "oast.fun",
+            "oast.me",
+            "interact.sh",
+            "interactsh.com"
+    ));
+
     private final MontoyaApi api;
     private final SwatcherTab tab;
     private final ConcurrentHashMap<Integer, Long> inFlightTimestamps = new ConcurrentHashMap<>();
@@ -43,6 +56,52 @@ public class SwatcherHttpHandler implements HttpHandler {
     public SwatcherHttpHandler(MontoyaApi api, SwatcherTab tab) {
         this.api = api;
         this.tab = tab;
+    }
+
+    /**
+     * Immunity against self-logging feedback loops and testing scaffolding noise.
+     * Excludes traffic to:
+     * 1. The Swatcher Central Server itself (preventing infinite recursive ingestion loops)
+     * 2. Loopback & Localhost probes (127.0.0.1, localhost, etc.)
+     * 3. Burp Collaborator & Out-Of-Band (OAST) interaction domains
+     */
+    private boolean isExcludedTraffic(String host, int port, String url) {
+        if (host == null || host.isEmpty()) return true;
+        String cleanHost = host.toLowerCase().trim();
+
+        // 1. Exclude Loopback & Localhost traffic
+        if (cleanHost.equals("localhost") || cleanHost.endsWith(".localhost")
+                || cleanHost.equals("127.0.0.1") || cleanHost.startsWith("127.")
+                || cleanHost.equals("0.0.0.0") || cleanHost.equals("::1")) {
+            return true;
+        }
+
+        // 2. Exclude Burp Collaborator & OAST scaffolding
+        for (String oast : OAST_DOMAINS) {
+            if (cleanHost.equals(oast) || cleanHost.endsWith("." + oast)) {
+                return true;
+            }
+        }
+
+        // 3. Loop Immunity: Exclude Swatcher Central Server itself
+        String serverUrl = SessionManager.getInstance().getServerUrl();
+        if (serverUrl != null && !serverUrl.trim().isEmpty()) {
+            if (url != null && url.startsWith(serverUrl)) {
+                return true;
+            }
+            try {
+                java.net.URI uri = java.net.URI.create(serverUrl);
+                String sHost = uri.getHost();
+                if (sHost != null && sHost.equalsIgnoreCase(cleanHost)) {
+                    int sPort = uri.getPort() != -1 ? uri.getPort() : (serverUrl.startsWith("https") ? 443 : 80);
+                    if (sPort == port || port == 0) {
+                        return true;
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+
+        return false;
     }
 
     /**
@@ -86,6 +145,15 @@ public class SwatcherHttpHandler implements HttpHandler {
     @Override
     public RequestToBeSentAction handleHttpRequestToBeSent(HttpRequestToBeSent requestToBeSent) {
         try {
+            String host = requestToBeSent.httpService().host();
+            int port = requestToBeSent.httpService().port();
+            String url = requestToBeSent.url();
+
+            // Ignore self-traffic, localhost, and OAST collaborator scaffolding
+            if (isExcludedTraffic(host, port, url)) {
+                return RequestToBeSentAction.continueWith(requestToBeSent);
+            }
+
             boolean recording = SessionManager.getInstance().isRecordingEnabled();
 
             // Track in-flight request start timestamp for accurate duration calculation
@@ -97,7 +165,6 @@ public class SwatcherHttpHandler implements HttpHandler {
             } else if (!recording && !SessionManager.getInstance().getServerUrl().isEmpty()) {
                 // If target is in scope but recording is NOT enabled, prompt user
                 if (requestToBeSent.isInScope() && SessionManager.getInstance().shouldPromptForActivation()) {
-                    String host = requestToBeSent.httpService().host();
                     ActivationModal.showActivationPrompt(tab, host);
                 }
             }
@@ -118,6 +185,15 @@ public class SwatcherHttpHandler implements HttpHandler {
         try {
             HttpRequest req = responseReceived.initiatingRequest();
             if (!req.isInScope()) {
+                return ResponseReceivedAction.continueWith(responseReceived);
+            }
+
+            String host = req.httpService().host();
+            int port = req.httpService().port();
+            String url = req.url();
+
+            // Exclude self-traffic, loopback, and OAST collaborator domains
+            if (isExcludedTraffic(host, port, url)) {
                 return ResponseReceivedAction.continueWith(responseReceived);
             }
 

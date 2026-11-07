@@ -15,11 +15,16 @@ public class ActivationModal {
 
         SwingUtilities.invokeLater(() -> {
             try {
-                Frame owner = (parent != null) ? (Frame) SwingUtilities.getWindowAncestor(parent) : null;
-                JDialog dialog = new JDialog(owner, "swatcher - Recording Inactive", false);
+                Window owner = (parent != null) ? SwingUtilities.getWindowAncestor(parent) : null;
+                JDialog dialog = new JDialog(owner, "swatcher - Recording Inactive", Dialog.ModalityType.MODELESS);
                 dialog.setLayout(new BorderLayout(15, 15));
                 dialog.setResizable(false);
+                dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
                 dialog.addWindowListener(new java.awt.event.WindowAdapter() {
+                    @Override
+                    public void windowClosing(java.awt.event.WindowEvent e) {
+                        isShowing = false;
+                    }
                     @Override
                     public void windowClosed(java.awt.event.WindowEvent e) {
                         isShowing = false;
@@ -109,10 +114,14 @@ public class ActivationModal {
                     return;
                 }
                 SessionManager.getInstance().startSession(ritm, appId, effort);
+                isShowing = false;
                 dialog.dispose();
             });
 
-            remindBtn.addActionListener(e -> dialog.dispose());
+            remindBtn.addActionListener(e -> {
+                isShowing = false;
+                dialog.dispose();
+            });
 
             btnPanel.add(remindBtn);
             btnPanel.add(enableBtn);

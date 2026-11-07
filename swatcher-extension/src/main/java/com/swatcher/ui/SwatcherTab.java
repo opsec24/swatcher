@@ -20,6 +20,8 @@ public class SwatcherTab extends JPanel {
     private final JTextField effortField;
     private final JTextField serverUrlField;
     private final JPasswordField apiKeyField;
+    private final JCheckBox trustCaCheckbox;
+    private final JTextField corpProxyField;
     private final JButton toggleBtn;
     private final JButton verifyBtn;
 
@@ -110,8 +112,37 @@ public class SwatcherTab extends JPanel {
         serverUrlField.setToolTipText("e.g. https://swatcher.corp.internal:9090");
         controlsBox.add(serverUrlField, gbc);
 
-        // Row 3: Actions
-        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 4;
+        // Row 3: Enterprise CA & Corporate Forward Proxy Configuration (McAfee, Zscaler, Internal PKI)
+        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2;
+        trustCaCheckbox = new JCheckBox("Trust Enterprise CAs (McAfee, Zscaler, Corp PKI)", SessionManager.getInstance().isTrustEnterpriseCAs());
+        trustCaCheckbox.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 11));
+        trustCaCheckbox.setToolTipText("Bypasses Java PKIX errors when corporate forward proxies (McAfee Web Gateway, Skyhigh, BlueCoat) inspect TLS traffic.");
+        trustCaCheckbox.addActionListener(e -> {
+            boolean selected = trustCaCheckbox.isSelected();
+            SessionManager.getInstance().setTrustEnterpriseCAs(selected);
+            appendConsoleLog(selected ? "✓ Enterprise CA trust enabled (McAfee/Zscaler/Corporate PKI)." : "⚠️ Strict CA verification enabled.");
+        });
+        controlsBox.add(trustCaCheckbox, gbc);
+
+        gbc.gridx = 2; gbc.gridwidth = 1;
+        controlsBox.add(new JLabel("Corporate Proxy:"), gbc);
+        gbc.gridx = 3;
+        corpProxyField = new JTextField(SessionManager.getInstance().getCorporateProxy(), 20);
+        corpProxyField.setToolTipText("Optional corporate forward proxy (e.g. proxy.corp.internal:8080 or http://10.0.0.1:8080)");
+        corpProxyField.getDocument().addDocumentListener(new DocumentListener() {
+            private void updateProxy() {
+                if (isUpdatingUI) return;
+                String proxy = corpProxyField.getText().trim();
+                SessionManager.getInstance().setCorporateProxy(proxy);
+            }
+            @Override public void insertUpdate(DocumentEvent e) { updateProxy(); }
+            @Override public void removeUpdate(DocumentEvent e) { updateProxy(); }
+            @Override public void changedUpdate(DocumentEvent e) { updateProxy(); }
+        });
+        controlsBox.add(corpProxyField, gbc);
+
+        // Row 4: Actions
+        gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 4;
         JPanel actionRow = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         toggleBtn = new JButton("Start Recording Session");
         toggleBtn.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
@@ -247,9 +278,15 @@ public class SwatcherTab extends JPanel {
         TrafficDispatcher.getInstance().addLogListener(this::appendConsoleLog);
 
         // Initial console greetings
-        appendConsoleLog("swatcher Burp Suite Traffic Collector v1.1.0 loaded.");
+        appendConsoleLog("swatcher Burp Suite Traffic Collector v1.2.0 loaded.");
         if (!SessionManager.getInstance().getServerUrl().isEmpty()) {
             appendConsoleLog("Configured Central Server: " + SessionManager.getInstance().getServerUrl());
+        }
+        if (SessionManager.getInstance().isTrustEnterpriseCAs()) {
+            appendConsoleLog("Enterprise CA Support: ENABLED (McAfee, Zscaler, Internal PKI)");
+        }
+        if (!SessionManager.getInstance().getCorporateProxy().isEmpty()) {
+            appendConsoleLog("Corporate Forward Proxy: " + SessionManager.getInstance().getCorporateProxy());
         }
         if (!SessionManager.getInstance().getRitm().isEmpty()) {
             appendConsoleLog("Active Engagement: " + SessionManager.getInstance().getRitm() + " (" + SessionManager.getInstance().getApplicationId() + ")");
@@ -361,6 +398,10 @@ public class SwatcherTab extends JPanel {
             if (!appIdField.hasFocus() && !appIdField.getText().trim().equalsIgnoreCase(appId)) appIdField.setText(appId);
             if (!effortField.hasFocus()) effortField.setText(String.valueOf((int) effort));
             if (!serverUrlField.hasFocus()) serverUrlField.setText(SessionManager.getInstance().getServerUrl());
+            if (!corpProxyField.hasFocus() && !corpProxyField.getText().trim().equals(SessionManager.getInstance().getCorporateProxy())) {
+                corpProxyField.setText(SessionManager.getInstance().getCorporateProxy());
+            }
+            trustCaCheckbox.setSelected(SessionManager.getInstance().isTrustEnterpriseCAs());
             if (!apiKeyField.hasFocus() && !new String(apiKeyField.getPassword()).trim().equals(SessionManager.getInstance().getApiKey())) {
                 apiKeyField.setText(SessionManager.getInstance().getApiKey());
             }

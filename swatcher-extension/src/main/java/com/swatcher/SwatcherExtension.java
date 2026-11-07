@@ -30,7 +30,7 @@ public class SwatcherExtension implements BurpExtension {
         });
 
         api.logging().logToOutput("=================================================");
-        api.logging().logToOutput("  swatcher v1.1.0 initialized successfully.");
+        api.logging().logToOutput("  swatcher v1.2.0 initialized successfully.");
         api.logging().logToOutput("  Burp Suite Traffic Governance & Proof-of-Work");
         api.logging().logToOutput("=================================================");
     }

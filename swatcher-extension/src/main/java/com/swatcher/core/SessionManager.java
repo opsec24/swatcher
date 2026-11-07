@@ -64,15 +64,23 @@ public class SessionManager {
     public synchronized void initializeFromBurp(MontoyaApi api) {
         this.api = api;
 
-        // 1. Read Global Workstation Preferences (Server URL, API Key & Cached Verification)
+        // 1. Read Global Workstation Preferences (Server URL, API Key, Proxy, Enterprise CAs & Cached Verification)
         try {
             String savedUrl = api.persistence().preferences().getString("swatcher.serverUrl");
             if (savedUrl != null && !savedUrl.trim().isEmpty()) {
-                this.serverUrl = savedUrl.trim();
+                this.serverUrl = normalizeServerUrl(savedUrl);
             }
             String savedKey = api.persistence().preferences().getString("swatcher.apiKey");
             if (savedKey != null && !savedKey.trim().isEmpty()) {
                 this.apiKey = savedKey.trim();
+            }
+            Boolean savedTrust = api.persistence().preferences().getBoolean("swatcher.trustEnterpriseCAs");
+            if (savedTrust != null) {
+                NetworkClient.setTrustEnterpriseCAs(savedTrust);
+            }
+            String savedCorpProxy = api.persistence().preferences().getString("swatcher.corporateProxy");
+            if (savedCorpProxy != null) {
+                NetworkClient.setCorporateProxy(savedCorpProxy);
             }
             Boolean cachedVerified = api.persistence().preferences().getBoolean("swatcher.isTokenVerified");
             if (cachedVerified != null && cachedVerified && !this.apiKey.isEmpty()) {
@@ -164,8 +172,7 @@ public class SessionManager {
 
         String endpoint = targetUrl.replaceAll("/+$", "") + "/api/v1/auth/verify-key";
         try {
-            URL url = new URL(endpoint);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            HttpURLConnection conn = NetworkClient.openConnection(endpoint);
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Authorization", "Bearer " + currentKey.trim());
             conn.setRequestProperty("Content-Type", "application/json");
@@ -337,9 +344,19 @@ public class SessionManager {
     public String getRitm() { return ritm; }
     public String getApplicationId() { return applicationId; }
     public double getAllocatedHours() { return allocatedHours; }
+    public String normalizeServerUrl(String url) {
+        if (url == null) return "";
+        String clean = url.trim();
+        if (clean.isEmpty()) return "";
+        if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
+            clean = "https://" + clean;
+        }
+        return clean;
+    }
+
     public String getServerUrl() { return serverUrl; }
     public void setServerUrl(String serverUrl) {
-        this.serverUrl = serverUrl != null ? serverUrl.trim() : "";
+        this.serverUrl = normalizeServerUrl(serverUrl);
         if (api != null) {
             try { api.persistence().preferences().setString("swatcher.serverUrl", this.serverUrl); } catch (Exception ignored) {}
         }
@@ -360,4 +377,30 @@ public class SessionManager {
     public String getAuthenticatedUsername() { return authenticatedUsername; }
     public String getTesterMachine() { return testerMachine; }
     public String getCurrentSessionId() { return currentSessionId; }
+
+    public boolean isTrustEnterpriseCAs() {
+        return NetworkClient.isTrustEnterpriseCAs();
+    }
+
+    public void setTrustEnterpriseCAs(boolean trust) {
+        NetworkClient.setTrustEnterpriseCAs(trust);
+        if (api != null) {
+            try {
+                api.persistence().preferences().setBoolean("swatcher.trustEnterpriseCAs", trust);
+            } catch (Exception ignored) {}
+        }
+    }
+
+    public String getCorporateProxy() {
+        return NetworkClient.getCorporateProxy();
+    }
+
+    public void setCorporateProxy(String proxy) {
+        NetworkClient.setCorporateProxy(proxy);
+        if (api != null) {
+            try {
+                api.persistence().preferences().setString("swatcher.corporateProxy", proxy != null ? proxy.trim() : "");
+            } catch (Exception ignored) {}
+        }
+    }
 }

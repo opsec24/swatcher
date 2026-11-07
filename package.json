@@ -1,12 +1,13 @@
 {
   "name": "swatcher",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Enterprise Burp Suite traffic governance, audit logging, and pentester proof-of-work platform",
   "main": "swatcher-server/src/server.js",
   "scripts": {
     "start": "npm --prefix swatcher-server start",
     "server": "npm --prefix swatcher-server start",
     "seed": "npm --prefix swatcher-server run seed",
+    "test": "npm --prefix swatcher-server test",
     "install:server": "npm --prefix swatcher-server install"
   },
   "keywords": [

@@ -5,8 +5,9 @@ function calculateActiveMinutes(timestamps, maxGapMinutes = 10, defaultBlockMinu
   if (timestamps.length === 1) return defaultBlockMinutes;
 
   const times = timestamps
+    .filter(t => t != null && t !== '')
     .map(t => new Date(t).getTime())
-    .filter(t => !isNaN(t))
+    .filter(t => !isNaN(t) && t > 946684800000) // Ensure valid timestamp (after Jan 1, 2000)
     .sort((a, b) => a - b);
 
   if (times.length === 0) return 0;

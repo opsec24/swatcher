@@ -49,4 +49,16 @@ public class SessionManagerTest {
         sessionManager.setApiKey("sw_test_key");
         assertFalse(sessionManager.shouldPromptForActivation());
     }
+
+    @Test
+    public void testServerUrlNormalization() {
+        sessionManager.setServerUrl("swatcher.corp.internal:9090");
+        assertEquals("https://swatcher.corp.internal:9090", sessionManager.getServerUrl());
+
+        sessionManager.setServerUrl("http://127.0.0.1:9090");
+        assertEquals("http://127.0.0.1:9090", sessionManager.getServerUrl());
+
+        sessionManager.setServerUrl("  https://central.swatcher.io/api/  ");
+        assertEquals("https://central.swatcher.io/api/", sessionManager.getServerUrl());
+    }
 }

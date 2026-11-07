@@ -134,10 +134,15 @@ public class OfflineQueueManager {
                 writer.flush();
             }
 
-            // Atomic file replace
+            // Atomic file replace with fallback for OS file locking (e.g. Windows)
             Path tmpPath = tmpFile.toPath();
             Path queuePath = queueFile.toPath();
-            Files.move(tmpPath, queuePath, StandardCopyOption.REPLACE_EXISTING);
+            try {
+                Files.move(tmpPath, queuePath, StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException moveEx) {
+                Files.copy(tmpPath, queuePath, StandardCopyOption.REPLACE_EXISTING);
+                tmpFile.delete();
+            }
 
             offlineCount.set(remaining);
         } catch (IOException e) {
