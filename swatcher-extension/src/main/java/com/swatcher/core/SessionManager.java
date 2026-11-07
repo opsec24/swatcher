@@ -19,18 +19,18 @@ public class SessionManager {
 
     private MontoyaApi api;
     private final AtomicBoolean recordingEnabled = new AtomicBoolean(false);
-    private String ritm = "";
-    private String applicationId = "";
-    private double allocatedHours = 40.0;
-    private String serverUrl = "http://localhost:9090";
-    private String apiKey = "";
-    private String testerMachine;
-    private String currentSessionId = "";
+    private volatile String ritm = "";
+    private volatile String applicationId = "";
+    private volatile double allocatedHours = 40.0;
+    private volatile String serverUrl = "http://localhost:9090";
+    private volatile String apiKey = "";
+    private volatile String testerMachine;
+    private volatile String currentSessionId = "";
 
     // Authenticated Identity from Server Handshake
-    private boolean isTokenVerified = false;
-    private String authenticatedFullName = "";
-    private String authenticatedUsername = "";
+    private volatile boolean isTokenVerified = false;
+    private volatile String authenticatedFullName = "";
+    private volatile String authenticatedUsername = "";
 
     private long lastPromptTimestamp = 0;
     private static final long PROMPT_COOLDOWN_MS = 60_000;
@@ -40,14 +40,18 @@ public class SessionManager {
         void onAuthStatusChanged(boolean isVerified, String fullName, String username, String message);
     }
 
-    private final List<SessionStateListener> listeners = new ArrayList<>();
+    private final List<SessionStateListener> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     private SessionManager() {
-        try {
-            this.testerMachine = InetAddress.getLocalHost().getHostName();
-        } catch (Exception e) {
-            this.testerMachine = "unknown_host";
+        // Safe, non-blocking hostname resolution (never hangs on offline DNS)
+        String host = System.getenv("HOSTNAME");
+        if (host == null || host.trim().isEmpty()) {
+            host = System.getenv("COMPUTERNAME");
         }
+        if (host == null || host.trim().isEmpty()) {
+            host = "workstation";
+        }
+        this.testerMachine = host;
     }
 
     public static synchronized SessionManager getInstance() {
@@ -128,24 +132,28 @@ public class SessionManager {
 
     /**
      * Handshake with central server: verifies API key and retrieves pentester identity.
+     * Non-blocking and never holds monitor locks during network I/O so Burp Suite never hangs.
      * If the server is temporarily offline, previously cached credentials remain valid.
      */
-    public synchronized boolean verifyApiKeyWithServer() {
-        if (apiKey == null || apiKey.trim().isEmpty()) {
-            isTokenVerified = false;
+    public boolean verifyApiKeyWithServer() {
+        String currentKey = this.apiKey;
+        String currentUrl = this.serverUrl;
+
+        if (currentKey == null || currentKey.trim().isEmpty()) {
+            this.isTokenVerified = false;
             notifyAuthListeners(false, "", "", "API Token is missing.");
             return false;
         }
 
-        String endpoint = serverUrl.replaceAll("/+$", "") + "/api/v1/auth/verify-key";
+        String endpoint = currentUrl.replaceAll("/+$", "") + "/api/v1/auth/verify-key";
         try {
             URL url = new URL(endpoint);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
-            conn.setRequestProperty("Authorization", "Bearer " + apiKey.trim());
+            conn.setRequestProperty("Authorization", "Bearer " + currentKey.trim());
             conn.setRequestProperty("Content-Type", "application/json");
-            conn.setConnectTimeout(4000);
-            conn.setReadTimeout(5000);
+            conn.setConnectTimeout(2000); // 2s quick connect timeout
+            conn.setReadTimeout(2500);
 
             int code = conn.getResponseCode();
             if (code == 200) {
@@ -166,7 +174,7 @@ public class SessionManager {
                             } catch (Exception ignored) {}
 
                             api.logging().logToOutput("=============================================================");
-                            api.logging().logToOutput("  swatcher // Authenticated with Central Server (" + serverUrl + ")");
+                            api.logging().logToOutput("  swatcher // Authenticated with Central Server (" + currentUrl + ")");
                             api.logging().logToOutput("  Welcome back, " + authenticatedFullName + " (" + authenticatedUsername + ")!");
                             api.logging().logToOutput("=============================================================");
                         }

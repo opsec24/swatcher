@@ -29,6 +29,7 @@ public class SwatcherTab extends JPanel {
 
     private final DefaultTableModel tableModel;
     private final JTable activityTable;
+    private boolean isUpdatingUI = false;
 
     public SwatcherTab() {
         setLayout(new BorderLayout(10, 10));
@@ -152,6 +153,7 @@ public class SwatcherTab extends JPanel {
         // Automatic Auto-Enable DocumentListener
         DocumentListener autoEnableListener = new DocumentListener() {
             private void triggerAutoCheck() {
+                if (isUpdatingUI) return;
                 String r = ritmField.getText().trim();
                 String a = appIdField.getText().trim();
                 String k = new String(apiKeyField.getPassword()).trim();
@@ -273,11 +275,18 @@ public class SwatcherTab extends JPanel {
     }
 
     private void updateSessionUI(boolean isRecording, String ritm, String appId, double effort) {
-        if (!ritmField.hasFocus()) ritmField.setText(ritm);
-        if (!appIdField.hasFocus()) appIdField.setText(appId);
-        if (!effortField.hasFocus()) effortField.setText(String.valueOf((int) effort));
-        if (!serverUrlField.hasFocus()) serverUrlField.setText(SessionManager.getInstance().getServerUrl());
-        if (!apiKeyField.hasFocus()) apiKeyField.setText(SessionManager.getInstance().getApiKey());
+        isUpdatingUI = true;
+        try {
+            if (!ritmField.hasFocus() && !ritmField.getText().trim().equalsIgnoreCase(ritm)) ritmField.setText(ritm);
+            if (!appIdField.hasFocus() && !appIdField.getText().trim().equalsIgnoreCase(appId)) appIdField.setText(appId);
+            if (!effortField.hasFocus()) effortField.setText(String.valueOf((int) effort));
+            if (!serverUrlField.hasFocus()) serverUrlField.setText(SessionManager.getInstance().getServerUrl());
+            if (!apiKeyField.hasFocus() && !new String(apiKeyField.getPassword()).trim().equals(SessionManager.getInstance().getApiKey())) {
+                apiKeyField.setText(SessionManager.getInstance().getApiKey());
+            }
+        } finally {
+            isUpdatingUI = false;
+        }
 
         updateStatusLabel();
     }

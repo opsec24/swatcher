@@ -7,11 +7,24 @@ import java.awt.*;
 
 public class ActivationModal {
 
+    private static volatile boolean isShowing = false;
+
     public static void showActivationPrompt(Component parent, String detectedHost) {
+        if (isShowing) return;
+        isShowing = true;
+
         SwingUtilities.invokeLater(() -> {
-            JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(parent), "swatcher - Recording Inactive", true);
-            dialog.setLayout(new BorderLayout(15, 15));
-            dialog.setResizable(false);
+            try {
+                Frame owner = (parent != null) ? (Frame) SwingUtilities.getWindowAncestor(parent) : null;
+                JDialog dialog = new JDialog(owner, "swatcher - Recording Inactive", false);
+                dialog.setLayout(new BorderLayout(15, 15));
+                dialog.setResizable(false);
+                dialog.addWindowListener(new java.awt.event.WindowAdapter() {
+                    @Override
+                    public void windowClosed(java.awt.event.WindowEvent e) {
+                        isShowing = false;
+                    }
+                });
 
             JPanel contentPanel = new JPanel();
             contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
@@ -101,6 +114,9 @@ public class ActivationModal {
             dialog.pack();
             dialog.setLocationRelativeTo(parent);
             dialog.setVisible(true);
-        });
+        } catch (Exception ex) {
+            isShowing = false;
+        }
+    });
     }
 }

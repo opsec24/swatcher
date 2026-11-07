@@ -25,6 +25,7 @@ public class TrafficDispatcher {
     private volatile boolean running = true;
     private volatile boolean serverOnline = true;
     private volatile boolean authValid = true;
+    private final java.util.concurrent.atomic.AtomicBoolean isDraining = new java.util.concurrent.atomic.AtomicBoolean(false);
 
     public enum UploadResult {
         SUCCESS,
@@ -91,8 +92,8 @@ public class TrafficDispatcher {
                     lastFlush = now;
                 }
 
-                // If offline queue has pending events or server is offline, periodically probe & drain
-                if ((!serverOnline || offlineQueue.hasPendingEvents()) && (now - lastOfflineProbe >= 4000)) {
+                // If offline queue has pending events or server is offline, periodically probe & drain (10s backoff)
+                if ((!serverOnline || offlineQueue.hasPendingEvents()) && (now - lastOfflineProbe >= 10000)) {
                     drainOfflineQueue();
                     lastOfflineProbe = now;
                 }
@@ -145,40 +146,48 @@ public class TrafficDispatcher {
 
     /**
      * Replays offline-stored logs in chunks to the central server when connectivity resumes.
+     * Uses non-blocking AtomicBoolean check instead of monitor locks to prevent UI hangs.
      */
-    public synchronized void drainOfflineQueue() {
+    public void drainOfflineQueue() {
         if (!offlineQueue.hasPendingEvents()) return;
-
-        int maxChunksPerPass = 20; // Up to 1000 events per pass
-        int pass = 0;
-
-        while (offlineQueue.hasPendingEvents() && pass < maxChunksPerPass) {
-            List<TrafficEvent> chunk = offlineQueue.peekBatch(50);
-            if (chunk.isEmpty()) break;
-
-            UploadResult result = executeHttpBatchUpload(chunk);
-            if (result == UploadResult.SUCCESS) {
-                serverOnline = true;
-                authValid = true;
-                offlineQueue.commitRemove(chunk.size());
-                totalUploaded.addAndGet(chunk.size());
-                notifyStats();
-                pass++;
-            } else if (result == UploadResult.AUTH_REJECTED) {
-                serverOnline = true;
-                authValid = false;
-                SessionManager.getInstance().markTokenRejected("Offline replay halted: API Key rejected (HTTP 401/403).");
-                notifyStats();
-                break;
-            } else {
-                serverOnline = false;
-                notifyStats();
-                break;
-            }
+        if (!isDraining.compareAndSet(false, true)) {
+            return; // Already draining on another thread
         }
 
-        if (!offlineQueue.hasPendingEvents() && serverOnline) {
-            System.out.println("[swatcher] All offline logs uploaded successfully. System back in LIVE recording mode.");
+        try {
+            int maxChunksPerPass = 20; // Up to 1000 events per pass
+            int pass = 0;
+
+            while (offlineQueue.hasPendingEvents() && pass < maxChunksPerPass) {
+                List<TrafficEvent> chunk = offlineQueue.peekBatch(50);
+                if (chunk.isEmpty()) break;
+
+                UploadResult result = executeHttpBatchUpload(chunk);
+                if (result == UploadResult.SUCCESS) {
+                    serverOnline = true;
+                    authValid = true;
+                    offlineQueue.commitRemove(chunk.size());
+                    totalUploaded.addAndGet(chunk.size());
+                    notifyStats();
+                    pass++;
+                } else if (result == UploadResult.AUTH_REJECTED) {
+                    serverOnline = true;
+                    authValid = false;
+                    SessionManager.getInstance().markTokenRejected("Offline replay halted: API Key rejected (HTTP 401/403).");
+                    notifyStats();
+                    break;
+                } else {
+                    serverOnline = false;
+                    notifyStats();
+                    break;
+                }
+            }
+
+            if (!offlineQueue.hasPendingEvents() && serverOnline) {
+                System.out.println("[swatcher] All offline logs uploaded successfully. System back in LIVE recording mode.");
+            }
+        } finally {
+            isDraining.set(false);
         }
     }
 
@@ -215,8 +224,8 @@ public class TrafficDispatcher {
                 conn.setRequestProperty("Authorization", "Bearer " + apiKey);
             }
 
-            conn.setConnectTimeout(4000);
-            conn.setReadTimeout(8000);
+            conn.setConnectTimeout(2500);
+            conn.setReadTimeout(3000);
             conn.setDoOutput(true);
 
             byte[] input = jsonPayload.getBytes(StandardCharsets.UTF_8);
