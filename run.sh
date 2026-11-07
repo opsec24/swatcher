@@ -84,6 +84,14 @@ case "$1" in
     echo -e "${GREEN}[✔] Services restarted.${NC}"
     exit 0
     ;;
+  --reset)
+    print_banner
+    echo -e "${RED}--> Resetting swatcher: destroying containers and persistent PostgreSQL volume...${NC}"
+    $COMPOSE_CMD down -v
+    rm -f .env
+    echo -e "${GREEN}[✔] Clean reset complete. Re-run ./run.sh to initialize fresh.${NC}"
+    exit 0
+    ;;
   --help|-h)
     print_banner
     echo -e "Usage: ./run.sh [option]"
@@ -93,6 +101,7 @@ case "$1" in
     echo "  --logs, -l   View streaming container logs"
     echo "  --status, -s Check running status and health of containers"
     echo "  --restart    Restart application containers"
+    echo "  --reset      Destroy containers and volume for a clean fresh start"
     echo "  --stop       Gracefully stop all containers"
     echo "  --help, -h   Show this help message"
     exit 0
@@ -243,9 +252,28 @@ echo -e "  ${CYAN}Containers: swatcher-db (PostgreSQL 16) + swatcher-app (Node 2
 $COMPOSE_CMD up -d --build
 
 # ------------------------------------------------------------------------------
-# STEP 4: Await Service Health
+# STEP 4: Synchronize PostgreSQL Credentials & Await Service Health
 # ------------------------------------------------------------------------------
-echo -e "\n${BOLD}[4/5] Waiting for PostgreSQL initialization and application healthcheck...${NC}"
+echo -e "\n${BOLD}[4/5] Synchronizing PostgreSQL credentials and verifying application health...${NC}"
+
+CURRENT_DB_USER=$(grep -E '^DB_USER=' .env 2>/dev/null | cut -d '=' -f2 | tr -d '[:space:]' || echo "swatcher")
+CURRENT_DB_PASS=$(grep -E '^DB_PASSWORD=' .env 2>/dev/null | cut -d '=' -f2 | tr -d '[:space:]' || echo "")
+CURRENT_DB_NAME=$(grep -E '^DB_NAME=' .env 2>/dev/null | cut -d '=' -f2 | tr -d '[:space:]' || echo "swatcher_db")
+
+# Wait for swatcher-db to accept local connections
+for j in $(seq 1 15); do
+  if $DOCKER_CMD exec -i swatcher-db pg_isready -U "$CURRENT_DB_USER" -d "$CURRENT_DB_NAME" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+
+# Synchronize PostgreSQL user password (prevents password drift if .env was regenerated while volume persisted)
+if [ -n "$CURRENT_DB_PASS" ]; then
+  $DOCKER_CMD exec -i swatcher-db psql -U "$CURRENT_DB_USER" -d "$CURRENT_DB_NAME" -c "ALTER USER \"$CURRENT_DB_USER\" WITH PASSWORD '$CURRENT_DB_PASS';" >/dev/null 2>&1 || true
+  # Ensure swatcher-app reconnects with the synced credentials
+  $COMPOSE_CMD restart swatcher-app >/dev/null 2>&1 || true
+fi
 
 RETRIES=30
 HEALTHY=false
