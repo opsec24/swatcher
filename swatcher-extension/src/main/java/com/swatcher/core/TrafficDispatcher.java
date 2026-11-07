@@ -298,7 +298,7 @@ public class TrafficDispatcher {
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
             conn.setRequestProperty("Content-Encoding", "gzip");
-            conn.setRequestProperty("User-Agent", "swatcher-burp-plugin/1.2.1");
+            conn.setRequestProperty("User-Agent", "swatcher-burp-plugin/1.2.2");
 
             if (apiKey != null && !apiKey.isEmpty()) {
                 conn.setRequestProperty("Authorization", "Bearer " + apiKey);

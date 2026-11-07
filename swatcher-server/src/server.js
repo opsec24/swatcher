@@ -70,7 +70,7 @@ app.get('/health', (req, res) => {
     status: 'UP',
     service: 'swatcher-server',
     db_type: 'postgresql',
-    version: '1.2.1',
+    version: '1.2.2',
     timestamp: new Date().toISOString()
   });
 });

@@ -118,12 +118,12 @@ chmod +x run.sh
 ```bash
 cd swatcher-extension
 ./gradlew jar
-# Produces: release/swatcher-1.2.1.jar (or swatcher-extension/build/libs/swatcher-1.2.1.jar)
+# Produces: release/swatcher-1.2.2.jar (or swatcher-extension/build/libs/swatcher-1.2.2.jar)
 ```
 
 ### 2. Install in Burp Suite
 1. In Burp Suite Pro, navigate to **Extensions** -> **Installed** -> **Add**.
-2. Select **Extension type: Java** and choose `release/swatcher-1.2.1.jar`.
+2. Select **Extension type: Java** and choose `release/swatcher-1.2.2.jar`.
 3. On first launch:
    - Enter Central Server URL: `http://<EC2-PUBLIC-IP>:9090` (or `https://...`).
    - Enter your assigned API Key: `sw_live_...`.

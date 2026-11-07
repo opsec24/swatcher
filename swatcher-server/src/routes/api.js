@@ -692,6 +692,15 @@ router.post('/sessions/verify', authenticateIngestion, async (req, res) => {
   }
 });
 
+function sanitizePgText(str, maxLength = null) {
+  if (str === null || str === undefined) return '';
+  let clean = String(str).replace(/\0/g, '');
+  if (maxLength && clean.length > maxLength) {
+    clean = clean.substring(0, maxLength);
+  }
+  return clean;
+}
+
 router.post('/ingest/batch', ingestLimiter, authenticateIngestion, async (req, res) => {
   try {
     const { batch, engagement, session_id } = req.body;
@@ -707,16 +716,18 @@ router.post('/ingest/batch', ingestLimiter, authenticateIngestion, async (req, r
     const rowsToInsert = [];
 
     for (const item of batch) {
-      const eventId = item.event_id || crypto.randomUUID();
-      const itemRitm = (item.engagement?.ritm || engagement?.ritm || 'UNKNOWN').trim().toUpperCase();
-      const itemAppId = (item.engagement?.application_id || engagement?.application_id || 'UNKNOWN').trim().toUpperCase();
-      const effortHours = parseFloat(item.engagement?.allocated_hours || engagement?.allocated_hours) || 40.0;
+      const eventId = sanitizePgText(item.event_id || crypto.randomUUID(), 128);
+      const rawRitm = item.engagement?.ritm || engagement?.ritm || 'UNKNOWN';
+      const rawAppId = item.engagement?.application_id || engagement?.application_id || 'UNKNOWN';
+      const itemRitm = sanitizePgText(String(rawRitm).trim().toUpperCase(), 128) || 'UNKNOWN';
+      const itemAppId = sanitizePgText(String(rawAppId).trim().toUpperCase(), 128) || 'UNKNOWN';
+      const effortHours = Math.max(0, parseFloat(item.engagement?.allocated_hours || engagement?.allocated_hours) || 40.0);
 
       let engRecord = engagementCache.get(itemRitm);
       if (engRecord === undefined) {
         engRecord = await db.get('SELECT * FROM engagements WHERE ritm = ?', [itemRitm]);
         if (!engRecord && itemRitm !== 'UNKNOWN') {
-          const engId = `eng_${itemRitm}_${Date.now()}`;
+          const engId = `eng_${itemRitm}_${Date.now()}`.slice(0, 64);
           try {
             await db.run('INSERT INTO engagements (id, ritm, application_id, client_name, allocated_hours, status, created_at) VALUES (?, ?, ?, \'\', ?, \'ACTIVE\', ?)', [
               engId, itemRitm, itemAppId, effortHours, now
@@ -728,16 +739,16 @@ router.post('/ingest/batch', ingestLimiter, authenticateIngestion, async (req, r
       }
 
       const resolvedAppId = engRecord ? engRecord.application_id : itemAppId;
-      const itemSessionId = item.session_id || session_id || `sess_${itemRitm}_${req.pentester.username}`;
-      const machineName = item.tester?.machine_name || '';
+      const itemSessionId = sanitizePgText(item.session_id || session_id || `sess_${itemRitm}_${req.pentester.username}`, 128);
+      const machineName = sanitizePgText(item.tester?.machine_name || '', 128);
 
       const reqData = item.request || {};
       const resData = item.response || {};
 
-      const tool = (reqData.tool || item.tool || 'PROXY').toUpperCase();
-      const timestamp = reqData.timestamp || item.timestamp || now;
-      const method = (reqData.method || 'GET').toUpperCase();
-      const url = reqData.url || '';
+      const tool = sanitizePgText((reqData.tool || item.tool || 'PROXY').toUpperCase(), 32);
+      const timestamp = sanitizePgText(reqData.timestamp || item.timestamp || now, 64);
+      const method = sanitizePgText((reqData.method || 'GET').toUpperCase(), 64);
+      const url = sanitizePgText(reqData.url || '');
 
       let host = reqData.host;
       if (!host) {
@@ -748,20 +759,21 @@ router.post('/ingest/batch', ingestLimiter, authenticateIngestion, async (req, r
         }
       }
       if (!host) host = 'unknown';
+      host = sanitizePgText(host);
 
-      const port = reqData.port || 443;
-      const path = reqData.path || '/';
-      const query = reqData.query || '';
+      const port = Math.min(Math.max(1, parseInt(reqData.port, 10) || 443), 65535);
+      const path = sanitizePgText(reqData.path || '/');
+      const query = sanitizePgText(reqData.query || '');
 
-      const reqHeadersStr = typeof reqData.headers === 'string' ? reqData.headers : JSON.stringify(reqData.headers || {});
-      const reqBody = reqData.body || '';
-      const reqBodyLen = reqData.body_length !== undefined ? reqData.body_length : reqBody.length;
+      const reqHeadersStr = sanitizePgText(typeof reqData.headers === 'string' ? reqData.headers : JSON.stringify(reqData.headers || {}));
+      const reqBody = sanitizePgText(reqData.body || '');
+      const reqBodyLen = Math.max(0, parseInt(reqData.body_length !== undefined ? reqData.body_length : reqBody.length, 10) || 0);
 
-      const statusCode = resData.status_code || 0;
-      const resHeadersStr = typeof resData.headers === 'string' ? resData.headers : JSON.stringify(resData.headers || {});
-      const resBody = resData.body || '';
-      const resBodyLen = resData.body_length !== undefined ? resData.body_length : resBody.length;
-      const durationMs = resData.duration_ms || 0;
+      const statusCode = Math.min(Math.max(0, parseInt(resData.status_code, 10) || 0), 999);
+      const resHeadersStr = sanitizePgText(typeof resData.headers === 'string' ? resData.headers : JSON.stringify(resData.headers || {}));
+      const resBody = sanitizePgText(resData.body || '');
+      const resBodyLen = Math.max(0, parseInt(resData.body_length !== undefined ? resData.body_length : resBody.length, 10) || 0);
+      const durationMs = Math.max(0, parseInt(resData.duration_ms, 10) || 0);
 
       rowsToInsert.push({
         event_id: eventId,
@@ -811,7 +823,7 @@ router.post('/ingest/batch', ingestLimiter, authenticateIngestion, async (req, r
     });
   } catch (err) {
     console.error('[swatcher-server] Error in /ingest/batch:', err);
-    res.status(500).json({ error: 'Failed to ingest traffic batch.' });
+    res.status(500).json({ error: 'Failed to ingest traffic batch: ' + err.message });
   }
 });
 

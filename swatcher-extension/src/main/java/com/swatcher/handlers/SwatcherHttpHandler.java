@@ -16,6 +16,7 @@ import com.swatcher.model.TrafficEvent;
 import com.swatcher.ui.ActivationModal;
 import com.swatcher.ui.SwatcherTab;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -106,18 +107,29 @@ public class SwatcherHttpHandler implements HttpHandler {
 
     /**
      * Safely extracts up to 64KB from ByteArray WITHOUT allocating full multi-megabyte heap Strings.
+     * Replaces illegal NUL (0x00) bytes that break SQL/PostgreSQL storage.
      */
     private String extractSafeBody(ByteArray body) {
         if (body == null || body.length() == 0) {
             return "";
         }
         int len = body.length();
-        if (len <= MAX_BODY_BYTES) {
-            return body.toString();
+        byte[] bytes = (len <= MAX_BODY_BYTES)
+                ? body.getBytes()
+                : body.subArray(0, MAX_BODY_BYTES).getBytes();
+
+        // Sanitize NUL (0x00) bytes which are illegal in PostgreSQL text/varchar columns
+        for (int i = 0; i < bytes.length; i++) {
+            if (bytes[i] == 0) {
+                bytes[i] = (byte) ' ';
+            }
         }
-        // Slice ONLY the first 64KB bytes from the ByteArray before converting to String
-        return body.subArray(0, MAX_BODY_BYTES).toString()
-                + "\n[swatcher: payload truncated at 64KB - original size: " + len + " bytes]";
+
+        String str = new String(bytes, StandardCharsets.UTF_8);
+        if (len > MAX_BODY_BYTES) {
+            str += "\n[swatcher: payload truncated at 64KB - original size: " + len + " bytes]";
+        }
+        return str;
     }
 
     private boolean isStaticBinary(String path) {

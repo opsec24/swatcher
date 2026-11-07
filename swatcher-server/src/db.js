@@ -61,7 +61,11 @@ const db = {
       const rowPlaceholders = [];
       for (const col of columns) {
         rowPlaceholders.push(`$${pIndex++}`);
-        params.push(row[col]);
+        let val = row[col];
+        if (typeof val === 'string' && val.includes('\0')) {
+          val = val.replace(/\0/g, '');
+        }
+        params.push(val);
       }
       valuePlaceholders.push(`(${rowPlaceholders.join(', ')})`);
     }
@@ -208,6 +212,15 @@ const db = {
       CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at);
       CREATE INDEX IF NOT EXISTS idx_sessions_user ON leadership_sessions(user_id);
       CREATE INDEX IF NOT EXISTS idx_sessions_ended ON leadership_sessions(ended_at);
+
+      -- Idempotent schema migrations for scale, large bodies, long hosts, and custom methods
+      ALTER TABLE traffic_logs ALTER COLUMN host TYPE TEXT;
+      ALTER TABLE traffic_logs ALTER COLUMN method TYPE VARCHAR(64);
+      ALTER TABLE traffic_logs ALTER COLUMN duration_ms TYPE BIGINT;
+      ALTER TABLE traffic_logs ALTER COLUMN ritm TYPE VARCHAR(128);
+      ALTER TABLE traffic_logs ALTER COLUMN application_id TYPE VARCHAR(128);
+      ALTER TABLE traffic_logs ALTER COLUMN request_body_length TYPE BIGINT;
+      ALTER TABLE traffic_logs ALTER COLUMN response_body_length TYPE BIGINT;
     `);
     console.log('[swatcher-db] PostgreSQL Schema and Indexes verified successfully.');
   },

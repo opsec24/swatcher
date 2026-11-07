@@ -1,6 +1,6 @@
 {
   "name": "swatcher-server",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Central Ingestion API & Leadership Dashboard for swatcher Burp traffic monitoring",
   "main": "src/server.js",
   "scripts": {
