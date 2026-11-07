@@ -84,6 +84,16 @@ case "$1" in
     echo -e "${GREEN}[✔] Services restarted.${NC}"
     exit 0
     ;;
+  --update|-u)
+    print_banner
+    echo -e "${BLUE}--> Pulling latest swatcher release from GitHub...${NC}"
+    git pull origin main
+    echo -e "${BLUE}--> Rebuilding swatcher application container with no-cache...${NC}"
+    $COMPOSE_CMD build --no-cache swatcher-app
+    $COMPOSE_CMD up -d swatcher-app
+    echo -e "${GREEN}[✔] Successfully updated swatcher to $(curl -s http://127.0.0.1:9090/health 2>/dev/null | grep -o '\"version\":\"[^\"]*\"' || echo 'latest').${NC}"
+    exit 0
+    ;;
   --reset)
     print_banner
     echo -e "${RED}--> Resetting swatcher: destroying containers and persistent PostgreSQL volume...${NC}"
@@ -101,6 +111,7 @@ case "$1" in
     echo "  --logs, -l   View streaming container logs"
     echo "  --status, -s Check running status and health of containers"
     echo "  --restart    Restart application containers"
+    echo "  --update, -u Pull latest release from git and rebuild container without cache"
     echo "  --reset      Destroy containers and volume for a clean fresh start"
     echo "  --stop       Gracefully stop all containers"
     echo "  --help, -h   Show this help message"

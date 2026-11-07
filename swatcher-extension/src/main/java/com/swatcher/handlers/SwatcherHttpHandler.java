@@ -144,12 +144,19 @@ public class SwatcherHttpHandler implements HttpHandler {
         return false;
     }
 
+    private static String sanitizeNul(String str) {
+        if (str == null) return "";
+        return str.replace('\0', ' ');
+    }
+
     private Map<String, String> extractHeaders(java.util.List<HttpHeader> headers) {
         Map<String, String> map = new HashMap<>();
         if (headers == null) return map;
         for (HttpHeader h : headers) {
             if (h.name() == null) continue;
-            map.merge(h.name(), h.value() != null ? h.value() : "", (oldVal, newVal) -> oldVal + "; " + newVal);
+            String name = sanitizeNul(h.name());
+            String val = sanitizeNul(h.value() != null ? h.value() : "");
+            map.merge(name, val, (oldVal, newVal) -> oldVal + "; " + newVal);
         }
         return map;
     }
@@ -234,9 +241,9 @@ public class SwatcherHttpHandler implements HttpHandler {
             // Request details
             event.request = new TrafficEvent.RequestInfo();
             event.request.tool = toolName;
-            event.request.method = req.method();
-            event.request.url = req.url();
-            event.request.host = req.httpService().host();
+            event.request.method = sanitizeNul(req.method());
+            event.request.url = sanitizeNul(req.url());
+            event.request.host = sanitizeNul(req.httpService().host());
             event.request.port = req.httpService().port();
             String path = req.path() != null ? req.path() : "/";
             String query = "";
@@ -245,8 +252,8 @@ public class SwatcherHttpHandler implements HttpHandler {
                 query = path.substring(qIdx + 1);
             }
 
-            event.request.path = path;
-            event.request.query = query;
+            event.request.path = sanitizeNul(path);
+            event.request.query = sanitizeNul(query);
             event.request.headers = extractHeaders(req.headers());
             event.request.body = extractSafeBody(req.body());
             event.request.body_length = req.body().length();
