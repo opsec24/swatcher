@@ -10,42 +10,45 @@ const app = express();
 const PORT = process.env.PORT || 9090;
 const HOST = process.env.HOST || '0.0.0.0';
 
-// Enterprise Defensive Security Headers
+// Defensively disable X-Powered-By header to prevent fingerprinting
+app.disable('x-powered-by');
+
+// Enterprise Defensive Security Headers (Fully self-contained for air-gapped environments)
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: [
-        "'self'",
-        "'unsafe-inline'",
-        "https://cdn.tailwindcss.com",
-        "https://cdn.jsdelivr.net",
-        "https://cdnjs.cloudflare.com"
-      ],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
       scriptSrcAttr: ["'unsafe-inline'"],
-      styleSrc: [
-        "'self'",
-        "'unsafe-inline'",
-        "https://fonts.googleapis.com",
-        "https://cdnjs.cloudflare.com"
-      ],
-      fontSrc: [
-        "'self'",
-        "https://fonts.gstatic.com",
-        "https://cdnjs.cloudflare.com"
-      ],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      fontSrc: ["'self'", "data:"],
       imgSrc: ["'self'", "data:"],
       connectSrc: ["'self'"],
       upgradeInsecureRequests: null
     }
   },
-  hsts: false,
+  hsts: process.env.ENABLE_HSTS === 'true' ? { maxAge: 31536000, includeSubDomains: true } : false,
   crossOriginEmbedderPolicy: false
 }));
 
-// Safe CORS policy (allows local Burp extensions and configured clients)
+// Hardened CORS policy: supports Burp Suite extensions and trusted dashboard origins
+const allowedOriginsEnv = process.env.CORS_ORIGIN;
+const allowedOrigins = allowedOriginsEnv ? allowedOriginsEnv.split(',').map(s => s.trim()) : null;
+
 app.use(cors({
-  origin: true,
+  origin: (origin, callback) => {
+    // Non-browser clients (Burp Suite Montoya extension, CLI tools) send no Origin header
+    if (!origin) return callback(null, true);
+    // Allow localhost / loopback addresses
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      return callback(null, true);
+    }
+    if (allowedOrigins) {
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error('Blocked by swatcher CORS Policy'));
+    }
+    return callback(null, true);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-Token', 'X-API-Key']
@@ -75,6 +78,19 @@ app.get('/health', (req, res) => {
 // Fallback to dashboard index for SPA navigation
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+});
+
+// Centralized Defensive Error Handler (Never leaks stack traces or internal DB errors)
+app.use((err, req, res, next) => {
+  console.error('[swatcher-server] Unhandled Application Error:', err);
+  if (res.headersSent) {
+    return next(err);
+  }
+  res.status(err.status || 500).json({
+    error: process.env.NODE_ENV === 'production' 
+      ? 'An unexpected internal server error occurred. Please contact an administrator.'
+      : err.message || 'Internal Server Error'
+  });
 });
 
 async function startServer() {

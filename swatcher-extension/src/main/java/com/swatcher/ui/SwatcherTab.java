@@ -7,8 +7,9 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 
 public class SwatcherTab extends JPanel {
 
@@ -27,8 +28,7 @@ public class SwatcherTab extends JPanel {
     private final JLabel failedLabel;
     private final JLabel backlogLabel;
 
-    private final DefaultTableModel tableModel;
-    private final JTable activityTable;
+    private final JTextArea consoleArea;
     private boolean isUpdatingUI = false;
 
     public SwatcherTab() {
@@ -142,16 +142,35 @@ public class SwatcherTab extends JPanel {
         topPanel.add(statsPanel);
         add(topPanel, BorderLayout.NORTH);
 
-        // Center: Live Traffic Table
-        String[] columnNames = {"Time", "Tool", "Method", "URL", "Status", "Duration"};
-        tableModel = new DefaultTableModel(columnNames, 0);
-        activityTable = new JTable(tableModel);
-        activityTable.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 11));
-        activityTable.setRowHeight(22);
+        // Center: High-Performance Lightweight Operational Console
+        consoleArea = new JTextArea();
+        consoleArea.setEditable(false);
+        consoleArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        consoleArea.setBackground(new Color(24, 24, 27)); // Modern dark zinc
+        consoleArea.setForeground(new Color(228, 228, 231)); // Crisp zinc text
+        consoleArea.setCaretColor(Color.WHITE);
+        consoleArea.setMargin(new Insets(8, 10, 8, 10));
 
-        JScrollPane scrollPane = new JScrollPane(activityTable);
-        scrollPane.setBorder(BorderFactory.createTitledBorder("Live Monitored Traffic Feed"));
-        add(scrollPane, BorderLayout.CENTER);
+        JScrollPane consoleScrollPane = new JScrollPane(consoleArea);
+        consoleScrollPane.setBorder(BorderFactory.createTitledBorder("swatcher System Activity & Diagnostics Console"));
+
+        JPanel centerPanel = new JPanel(new BorderLayout(0, 4));
+        centerPanel.add(consoleScrollPane, BorderLayout.CENTER);
+
+        JPanel consoleFooter = new JPanel(new BorderLayout());
+        JLabel consoleHelp = new JLabel(" Operational logs and queue activity stream (high-performance, zero UI overhead).");
+        consoleHelp.setFont(new Font(Font.SANS_SERIF, Font.ITALIC, 11));
+        consoleHelp.setForeground(new Color(107, 114, 128));
+
+        JButton clearBtn = new JButton("Clear Console");
+        clearBtn.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 11));
+        clearBtn.addActionListener(e -> consoleArea.setText(""));
+
+        consoleFooter.add(consoleHelp, BorderLayout.WEST);
+        consoleFooter.add(clearBtn, BorderLayout.EAST);
+        centerPanel.add(consoleFooter, BorderLayout.SOUTH);
+
+        add(centerPanel, BorderLayout.CENTER);
 
         // Automatic Auto-Enable DocumentListener
         DocumentListener autoEnableListener = new DocumentListener() {
@@ -190,15 +209,30 @@ public class SwatcherTab extends JPanel {
         SessionManager.getInstance().addListener(new SessionManager.SessionStateListener() {
             @Override
             public void onSessionStateChanged(boolean isRecording, String ritm, String appId, double effort) {
-                SwingUtilities.invokeLater(() -> updateSessionUI(isRecording, ritm, appId, effort));
+                SwingUtilities.invokeLater(() -> {
+                    updateSessionUI(isRecording, ritm, appId, effort);
+                    if (isRecording) {
+                        appendConsoleLog("▶ Session ACTIVE: " + ritm + " (" + appId + ") - " + ((int) effort) + "h allocated effort.");
+                    } else {
+                        appendConsoleLog("⏸ Session PAUSED.");
+                    }
+                });
             }
 
             @Override
             public void onAuthStatusChanged(boolean isVerified, String fullName, String username, String message) {
-                SwingUtilities.invokeLater(() -> updateAuthUI(isVerified, fullName, username, message));
+                SwingUtilities.invokeLater(() -> {
+                    updateAuthUI(isVerified, fullName, username, message);
+                    if (isVerified) {
+                        appendConsoleLog("✓ Authenticated with Central Server as " + fullName + " (" + username + ").");
+                    } else if (message != null && !message.isEmpty()) {
+                        appendConsoleLog("⚠️ " + message);
+                    }
+                });
             }
         });
 
+        // Wire dispatcher stats telemetry listener (throttled/debounced)
         TrafficDispatcher.getInstance().addStatsListener((buffered, uploaded, failed, queueSize, offlineCount, isServerOnline) -> {
             SwingUtilities.invokeLater(() -> {
                 bufferedLabel.setText("Buffered: " + buffered);
@@ -209,7 +243,34 @@ public class SwatcherTab extends JPanel {
             });
         });
 
+        // Wire dispatcher operational log listener
+        TrafficDispatcher.getInstance().addLogListener(this::appendConsoleLog);
+
+        // Initial console greetings
+        appendConsoleLog("swatcher Burp Suite Traffic Collector v1.1.0 loaded.");
+        if (!SessionManager.getInstance().getServerUrl().isEmpty()) {
+            appendConsoleLog("Configured Central Server: " + SessionManager.getInstance().getServerUrl());
+        }
+        if (!SessionManager.getInstance().getRitm().isEmpty()) {
+            appendConsoleLog("Active Engagement: " + SessionManager.getInstance().getRitm() + " (" + SessionManager.getInstance().getApplicationId() + ")");
+        }
+
         updateStatusLabel();
+    }
+
+    public void appendConsoleLog(String message) {
+        SwingUtilities.invokeLater(() -> {
+            String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+            consoleArea.append("[" + time + "] " + message + "\n");
+            int lineCount = consoleArea.getLineCount();
+            if (lineCount > 300) {
+                try {
+                    int endOffset = consoleArea.getLineEndOffset(lineCount - 250);
+                    consoleArea.replaceRange("", 0, endOffset);
+                } catch (Exception ignored) {}
+            }
+            consoleArea.setCaretPosition(consoleArea.getDocument().getLength());
+        });
     }
 
     private void handleVerifyAndSaveKey() {
@@ -230,6 +291,7 @@ public class SwatcherTab extends JPanel {
         SessionManager.getInstance().setApiKey(token);
         verifyBtn.setEnabled(false);
         verifyBtn.setText("Verifying...");
+        appendConsoleLog("Verifying API token against " + url + "...");
 
         new Thread(() -> {
             boolean valid = SessionManager.getInstance().verifyApiKeyWithServer();
@@ -357,14 +419,5 @@ public class SwatcherTab extends JPanel {
             toggleBtn.setBackground(new Color(239, 68, 68)); // Red
             toggleBtn.setForeground(Color.WHITE);
         }
-    }
-
-    public void addTrafficRow(String time, String tool, String method, String url, int status, long durationMs) {
-        SwingUtilities.invokeLater(() -> {
-            if (tableModel.getRowCount() > 200) {
-                tableModel.removeRow(0);
-            }
-            tableModel.addRow(new Object[]{time, tool, method, url, status, durationMs + "ms"});
-        });
     }
 }

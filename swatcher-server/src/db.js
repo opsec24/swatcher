@@ -50,6 +50,27 @@ const db = {
     return { changes: res.rowCount };
   },
 
+  async insertBatch(table, columns, rows, onConflict = 'ON CONFLICT (event_id) DO NOTHING') {
+    if (!rows || rows.length === 0) return { changes: 0 };
+    const colList = columns.join(', ');
+    const valuePlaceholders = [];
+    const params = [];
+    let pIndex = 1;
+
+    for (const row of rows) {
+      const rowPlaceholders = [];
+      for (const col of columns) {
+        rowPlaceholders.push(`$${pIndex++}`);
+        params.push(row[col]);
+      }
+      valuePlaceholders.push(`(${rowPlaceholders.join(', ')})`);
+    }
+
+    const sql = `INSERT INTO ${table} (${colList}) VALUES ${valuePlaceholders.join(', ')} ${onConflict}`;
+    const res = await pgPool.query(sql, params);
+    return { changes: res.rowCount };
+  },
+
   async exec(sql) {
     await pgPool.query(sql);
   },
@@ -174,6 +195,13 @@ const db = {
       CREATE INDEX IF NOT EXISTS idx_traffic_tool ON traffic_logs(tool);
       CREATE INDEX IF NOT EXISTS idx_traffic_timestamp ON traffic_logs(timestamp);
       CREATE INDEX IF NOT EXISTS idx_traffic_host ON traffic_logs(host);
+
+      -- High-Performance Composite Indexes for Enterprise Scale (150+ pentests / 50 testers)
+      CREATE INDEX IF NOT EXISTS idx_traffic_ritm_time ON traffic_logs(ritm, timestamp DESC);
+      CREATE INDEX IF NOT EXISTS idx_traffic_tool_time ON traffic_logs(tool, timestamp DESC);
+      CREATE INDEX IF NOT EXISTS idx_traffic_tester_ritm ON traffic_logs(tester_username, ritm);
+      CREATE INDEX IF NOT EXISTS idx_traffic_status ON traffic_logs(status_code);
+
       CREATE INDEX IF NOT EXISTS idx_pentesters_apikey ON pentesters(api_key);
       CREATE INDEX IF NOT EXISTS idx_engagements_ritm ON engagements(ritm);
       CREATE INDEX IF NOT EXISTS idx_engagements_appid ON engagements(application_id);

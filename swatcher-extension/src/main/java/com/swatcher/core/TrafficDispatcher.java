@@ -3,6 +3,7 @@ package com.swatcher.core;
 import com.google.gson.Gson;
 import com.swatcher.model.TrafficEvent;
 
+import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -12,8 +13,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.zip.GZIPOutputStream;
 
 public class TrafficDispatcher {
     private static TrafficDispatcher instance;
@@ -25,7 +29,7 @@ public class TrafficDispatcher {
     private volatile boolean running = true;
     private volatile boolean serverOnline = true;
     private volatile boolean authValid = true;
-    private final java.util.concurrent.atomic.AtomicBoolean isDraining = new java.util.concurrent.atomic.AtomicBoolean(false);
+    private final AtomicBoolean isDraining = new AtomicBoolean(false);
 
     public enum UploadResult {
         SUCCESS,
@@ -36,12 +40,19 @@ public class TrafficDispatcher {
     private final AtomicLong totalBuffered = new AtomicLong(0);
     private final AtomicLong totalUploaded = new AtomicLong(0);
     private final AtomicLong totalFailed = new AtomicLong(0);
+    private final AtomicLong lastStatsNotify = new AtomicLong(0);
+    private final AtomicLong lastLoggedUploaded = new AtomicLong(0);
 
     public interface DispatcherStatsListener {
         void onStatsUpdated(long buffered, long uploaded, long failed, int queueSize, long offlineCount, boolean isServerOnline);
     }
 
-    private final List<DispatcherStatsListener> statsListeners = new ArrayList<>();
+    public interface OperationalLogListener {
+        void onOperationalLog(String message);
+    }
+
+    private final List<DispatcherStatsListener> statsListeners = new CopyOnWriteArrayList<>();
+    private final List<OperationalLogListener> logListeners = new CopyOnWriteArrayList<>();
 
     private TrafficDispatcher() {
         this.workerThread = new Thread(this::runWorker, "swatcher-dispatcher-worker");
@@ -59,7 +70,7 @@ public class TrafficDispatcher {
     public void enqueue(TrafficEvent event) {
         if (queue.offer(event)) {
             totalBuffered.incrementAndGet();
-            notifyStats();
+            notifyStats(false);
         } else {
             System.err.println("[swatcher] Queue full! Persisting directly to offline store.");
             List<TrafficEvent> fallbackList = new ArrayList<>();
@@ -67,7 +78,8 @@ public class TrafficDispatcher {
             offlineQueue.appendEvents(fallbackList);
             serverOnline = false;
             totalFailed.incrementAndGet();
-            notifyStats();
+            notifyStats(true);
+            notifyLog("⚠️ Queue capacity exceeded (5000). Overflow buffered directly to offline store.");
         }
     }
 
@@ -117,7 +129,7 @@ public class TrafficDispatcher {
         if (serverUrl == null || serverUrl.trim().isEmpty()) {
             offlineQueue.appendEvents(batch);
             totalFailed.addAndGet(batch.size());
-            notifyStats();
+            notifyStats(true);
             return;
         }
 
@@ -125,31 +137,47 @@ public class TrafficDispatcher {
         if (!serverOnline) {
             offlineQueue.appendEvents(batch);
             totalFailed.addAndGet(batch.size());
-            notifyStats();
+            notifyStats(false);
             return;
         }
 
         UploadResult result = executeHttpBatchUpload(batch);
         if (result == UploadResult.SUCCESS) {
+            boolean wasOffline = !serverOnline;
             serverOnline = true;
             authValid = true;
-            totalUploaded.addAndGet(batch.size());
+            long uploaded = totalUploaded.addAndGet(batch.size());
+
+            if (wasOffline) {
+                notifyLog("✓ Central server connection restored.");
+            }
+
+            // Periodic upload milestone logging (every ~100 events)
+            if (uploaded - lastLoggedUploaded.get() >= 100) {
+                lastLoggedUploaded.set(uploaded);
+                notifyLog("Uploaded " + uploaded + " events to " + serverUrl + " (gzip compressed).");
+            }
+
             if (offlineQueue.hasPendingEvents()) {
                 drainOfflineQueue();
             }
         } else if (result == UploadResult.AUTH_REJECTED) {
-            serverOnline = true; // Server IS online!
+            serverOnline = true; // Server is online, but auth failed
             authValid = false;
             SessionManager.getInstance().markTokenRejected("API Token rejected by server (HTTP 401/403).");
             offlineQueue.appendEvents(batch);
             totalFailed.addAndGet(batch.size());
+            notifyLog("❌ API Token rejected by server (HTTP 401/403). Session recording paused.");
         } else {
+            boolean wasOnline = serverOnline;
             serverOnline = false;
             offlineQueue.appendEvents(batch);
             totalFailed.addAndGet(batch.size());
-            System.err.println("[swatcher] Server offline! Saved " + batch.size() + " logs to local offline store: " + offlineQueue.getQueueFilePath());
+            if (wasOnline) {
+                notifyLog("⚠️ Central server unreachable. Buffering events locally to offline store.");
+            }
         }
-        notifyStats();
+        notifyStats(true);
     }
 
     /**
@@ -169,11 +197,16 @@ public class TrafficDispatcher {
         }
 
         try {
-            int maxChunksPerPass = 20; // Up to 1000 events per pass
+            int maxChunksPerPass = 20; // Up to 2000 events per pass
             int pass = 0;
+            long initialOffline = offlineQueue.getOfflineCount();
+
+            if (initialOffline > 0) {
+                notifyLog("Draining " + initialOffline + " offline-buffered logs to central server...");
+            }
 
             while (offlineQueue.hasPendingEvents() && pass < maxChunksPerPass) {
-                List<TrafficEvent> chunk = offlineQueue.peekBatch(50);
+                List<TrafficEvent> chunk = offlineQueue.peekBatch(100); // 100 events per replay chunk
                 if (chunk.isEmpty()) break;
 
                 UploadResult result = executeHttpBatchUpload(chunk);
@@ -182,23 +215,24 @@ public class TrafficDispatcher {
                     authValid = true;
                     offlineQueue.commitRemove(chunk.size());
                     totalUploaded.addAndGet(chunk.size());
-                    notifyStats();
+                    notifyStats(true);
                     pass++;
                 } else if (result == UploadResult.AUTH_REJECTED) {
                     serverOnline = true;
                     authValid = false;
                     SessionManager.getInstance().markTokenRejected("Offline replay halted: API Key rejected (HTTP 401/403).");
-                    notifyStats();
+                    notifyStats(true);
+                    notifyLog("❌ Offline replay halted: API Key rejected (HTTP 401/403).");
                     break;
                 } else {
                     serverOnline = false;
-                    notifyStats();
+                    notifyStats(true);
                     break;
                 }
             }
 
             if (!offlineQueue.hasPendingEvents() && serverOnline) {
-                System.out.println("[swatcher] All offline logs uploaded successfully. System back in LIVE recording mode.");
+                notifyLog("✓ All offline logs uploaded successfully. System operating in LIVE recording mode.");
             }
         } finally {
             isDraining.set(false);
@@ -231,24 +265,32 @@ public class TrafficDispatcher {
             ));
 
             String jsonPayload = gson.toJson(payload);
+            byte[] rawBytes = jsonPayload.getBytes(StandardCharsets.UTF_8);
+
+            // GZIP compress payload (shrinks JSON network transit by ~85%)
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            try (GZIPOutputStream gzos = new GZIPOutputStream(baos)) {
+                gzos.write(rawBytes);
+            }
+            byte[] compressedBytes = baos.toByteArray();
 
             URL url = new URL(endpoint);
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-            conn.setRequestProperty("User-Agent", "swatcher-burp-plugin/1.0");
+            conn.setRequestProperty("Content-Encoding", "gzip");
+            conn.setRequestProperty("User-Agent", "swatcher-burp-plugin/1.1.0");
 
             if (apiKey != null && !apiKey.isEmpty()) {
                 conn.setRequestProperty("Authorization", "Bearer " + apiKey);
             }
 
             conn.setConnectTimeout(2500);
-            conn.setReadTimeout(3000);
+            conn.setReadTimeout(5000);
             conn.setDoOutput(true);
 
-            byte[] input = jsonPayload.getBytes(StandardCharsets.UTF_8);
             try (OutputStream os = conn.getOutputStream()) {
-                os.write(input, 0, input.length);
+                os.write(compressedBytes, 0, compressedBytes.length);
             }
 
             int code = conn.getResponseCode();
@@ -272,18 +314,40 @@ public class TrafficDispatcher {
         statsListeners.add(listener);
     }
 
-    private void notifyStats() {
-        long buffered = totalBuffered.get();
-        long uploaded = totalUploaded.get();
-        long failed = totalFailed.get();
-        int queueSize = queue.size();
-        long offlineCount = offlineQueue.getOfflineCount();
-        boolean online = serverOnline;
+    public void addLogListener(OperationalLogListener listener) {
+        logListeners.add(listener);
+    }
 
-        for (DispatcherStatsListener listener : statsListeners) {
+    private void notifyLog(String message) {
+        for (OperationalLogListener l : logListeners) {
             try {
-                listener.onStatsUpdated(buffered, uploaded, failed, queueSize, offlineCount, online);
+                l.onOperationalLog(message);
             } catch (Exception ignored) {}
+        }
+    }
+
+    /**
+     * Debounced stats notification (at most 4 updates/sec unless forced) to prevent EDT flooding.
+     */
+    private void notifyStats(boolean force) {
+        long now = System.currentTimeMillis();
+        long last = lastStatsNotify.get();
+        if (!force && (now - last < 250)) {
+            return;
+        }
+        if (lastStatsNotify.compareAndSet(last, now) || force) {
+            long buffered = totalBuffered.get();
+            long uploaded = totalUploaded.get();
+            long failed = totalFailed.get();
+            int queueSize = queue.size();
+            long offlineCount = offlineQueue.getOfflineCount();
+            boolean online = serverOnline;
+
+            for (DispatcherStatsListener listener : statsListeners) {
+                try {
+                    listener.onStatsUpdated(buffered, uploaded, failed, queueSize, offlineCount, online);
+                } catch (Exception ignored) {}
+            }
         }
     }
 

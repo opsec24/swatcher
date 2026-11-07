@@ -42,6 +42,14 @@ const setupLimiter = rateLimit({
   message: { error: 'Too many setup attempts from this IP.' }
 });
 
+const ingestLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 300, // 300 batches per minute per client IP/tester
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many ingestion batch requests. Please slow down.' }
+});
+
 function getClientIp(req) {
   const forwarded = req.headers['x-forwarded-for'];
   if (forwarded) {
@@ -684,7 +692,7 @@ router.post('/sessions/verify', authenticateIngestion, async (req, res) => {
   }
 });
 
-router.post('/ingest/batch', authenticateIngestion, async (req, res) => {
+router.post('/ingest/batch', ingestLimiter, authenticateIngestion, async (req, res) => {
   try {
     const { batch, engagement, session_id } = req.body;
     if (!Array.isArray(batch) || batch.length === 0) {
@@ -695,8 +703,8 @@ router.post('/ingest/batch', authenticateIngestion, async (req, res) => {
     }
 
     const now = new Date().toISOString();
-    let ingested = 0;
     const engagementCache = new Map();
+    const rowsToInsert = [];
 
     for (const item of batch) {
       const eventId = item.event_id || crypto.randomUUID();
@@ -755,28 +763,44 @@ router.post('/ingest/batch', authenticateIngestion, async (req, res) => {
       const resBodyLen = resData.body_length !== undefined ? resData.body_length : resBody.length;
       const durationMs = resData.duration_ms || 0;
 
-      try {
-        await db.run(`
-          INSERT INTO traffic_logs (
-            event_id, session_id, ritm, application_id, tester_id, tester_username, tester_machine,
-            tool, timestamp, method, url, host, port, path, query,
-            request_headers, request_body, request_body_length,
-            status_code, response_headers, response_body, response_body_length,
-            duration_ms, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT (event_id) DO NOTHING
-        `, [
-          eventId, itemSessionId, itemRitm, resolvedAppId, req.pentester.id, req.pentester.username, machineName,
-          tool, timestamp, method, url, host, port, path, query,
-          reqHeadersStr, reqBody, reqBodyLen,
-          statusCode, resHeadersStr, resBody, resBodyLen,
-          durationMs, now
-        ]);
-        ingested++;
-      } catch (err) {
-        console.error('[swatcher-server] Failed to insert log entry:', err.message);
-      }
+      rowsToInsert.push({
+        event_id: eventId,
+        session_id: itemSessionId,
+        ritm: itemRitm,
+        application_id: resolvedAppId,
+        tester_id: req.pentester.id,
+        tester_username: req.pentester.username,
+        tester_machine: machineName,
+        tool,
+        timestamp,
+        method,
+        url,
+        host,
+        port,
+        path,
+        query,
+        request_headers: reqHeadersStr,
+        request_body: reqBody,
+        request_body_length: reqBodyLen,
+        status_code: statusCode,
+        response_headers: resHeadersStr,
+        response_body: resBody,
+        response_body_length: resBodyLen,
+        duration_ms: durationMs,
+        created_at: now
+      });
     }
+
+    const columns = [
+      'event_id', 'session_id', 'ritm', 'application_id', 'tester_id', 'tester_username', 'tester_machine',
+      'tool', 'timestamp', 'method', 'url', 'host', 'port', 'path', 'query',
+      'request_headers', 'request_body', 'request_body_length',
+      'status_code', 'response_headers', 'response_body', 'response_body_length',
+      'duration_ms', 'created_at'
+    ];
+
+    const result = await db.insertBatch('traffic_logs', columns, rowsToInsert);
+    const ingested = result.changes !== undefined ? result.changes : rowsToInsert.length;
 
     res.json({
       status: 'OK',
@@ -786,7 +810,8 @@ router.post('/ingest/batch', authenticateIngestion, async (req, res) => {
       timestamp: now
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[swatcher-server] Error in /ingest/batch:', err);
+    res.status(500).json({ error: 'Failed to ingest traffic batch.' });
   }
 });
 
