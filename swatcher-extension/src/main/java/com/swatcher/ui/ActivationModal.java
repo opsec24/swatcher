@@ -86,6 +86,15 @@ public class ActivationModal {
                 double effort = 40.0;
                 try { effort = Double.parseDouble(effortField.getText().trim()); } catch (Exception ignored) {}
 
+                if (SessionManager.getInstance().getServerUrl().isEmpty()) {
+                    JOptionPane.showMessageDialog(dialog,
+                            "Your Swatcher Central Server URL is not configured.\n"
+                            + "Please open the 'swatcher' tab in Burp Suite and configure your Central Server URL.",
+                            "Server URL Required", JOptionPane.WARNING_MESSAGE);
+                    dialog.dispose();
+                    return;
+                }
+
                 if (SessionManager.getInstance().getApiKey().isEmpty()) {
                     JOptionPane.showMessageDialog(dialog,
                             "Your Swatcher API Key is not configured.\n"

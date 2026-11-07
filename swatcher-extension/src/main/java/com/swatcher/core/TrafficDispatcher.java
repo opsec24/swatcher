@@ -113,6 +113,14 @@ public class TrafficDispatcher {
     private void handleDispatchBatch(List<TrafficEvent> batch) {
         if (batch.isEmpty()) return;
 
+        String serverUrl = SessionManager.getInstance().getServerUrl();
+        if (serverUrl == null || serverUrl.trim().isEmpty()) {
+            offlineQueue.appendEvents(batch);
+            totalFailed.addAndGet(batch.size());
+            notifyStats();
+            return;
+        }
+
         // If server is known to be offline, immediately save to local disk without waiting for connection timeout
         if (!serverOnline) {
             offlineQueue.appendEvents(batch);
@@ -150,6 +158,12 @@ public class TrafficDispatcher {
      */
     public void drainOfflineQueue() {
         if (!offlineQueue.hasPendingEvents()) return;
+
+        String serverUrl = SessionManager.getInstance().getServerUrl();
+        if (serverUrl == null || serverUrl.trim().isEmpty()) {
+            return;
+        }
+
         if (!isDraining.compareAndSet(false, true)) {
             return; // Already draining on another thread
         }
@@ -195,6 +209,10 @@ public class TrafficDispatcher {
         if (batch.isEmpty()) return UploadResult.SUCCESS;
 
         String serverUrl = SessionManager.getInstance().getServerUrl();
+        if (serverUrl == null || serverUrl.trim().isEmpty()) {
+            return UploadResult.NETWORK_OFFLINE;
+        }
+
         String apiKey = SessionManager.getInstance().getApiKey();
         String endpoint = serverUrl.replaceAll("/+$", "") + "/api/v1/ingest/batch";
 

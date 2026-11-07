@@ -22,7 +22,7 @@ public class SessionManager {
     private volatile String ritm = "";
     private volatile String applicationId = "";
     private volatile double allocatedHours = 40.0;
-    private volatile String serverUrl = "http://localhost:9090";
+    private volatile String serverUrl = "";
     private volatile String apiKey = "";
     private volatile String testerMachine;
     private volatile String currentSessionId = "";
@@ -100,8 +100,8 @@ public class SessionManager {
                 }
                 this.currentSessionId = "sess_" + this.ritm + "_" + System.currentTimeMillis();
 
-                // If token and project details are present, auto-enable recording immediately!
-                if (!apiKey.isEmpty()) {
+                // If token, server URL, and project details are present, auto-enable recording immediately!
+                if (!apiKey.isEmpty() && !serverUrl.isEmpty()) {
                     this.recordingEnabled.set(true);
                 }
             }
@@ -111,6 +111,11 @@ public class SessionManager {
 
         // 3. Perform Server Handshake in Background Thread
         new Thread(() -> {
+            if (serverUrl == null || serverUrl.trim().isEmpty()) {
+                api.logging().logToOutput("[swatcher] No Central Server URL configured. Please configure your server URL in the 'swatcher' tab.");
+                notifyAuthListeners(false, "", "", "Central Server URL required. Please configure in the swatcher tab.");
+                return;
+            }
             if (apiKey != null && !apiKey.isEmpty()) {
                 boolean verified = verifyApiKeyWithServer();
                 if (verified) {
@@ -139,13 +144,25 @@ public class SessionManager {
         String currentKey = this.apiKey;
         String currentUrl = this.serverUrl;
 
+        if (currentUrl == null || currentUrl.trim().isEmpty()) {
+            this.isTokenVerified = false;
+            notifyAuthListeners(false, "", "", "Central Server URL is missing.");
+            return false;
+        }
+
         if (currentKey == null || currentKey.trim().isEmpty()) {
             this.isTokenVerified = false;
             notifyAuthListeners(false, "", "", "API Token is missing.");
             return false;
         }
 
-        String endpoint = currentUrl.replaceAll("/+$", "") + "/api/v1/auth/verify-key";
+        String targetUrl = currentUrl.trim();
+        if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) {
+            targetUrl = "https://" + targetUrl;
+            this.serverUrl = targetUrl;
+        }
+
+        String endpoint = targetUrl.replaceAll("/+$", "") + "/api/v1/auth/verify-key";
         try {
             URL url = new URL(endpoint);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -217,14 +234,15 @@ public class SessionManager {
     }
 
     /**
-     * Auto-starts the session if token, RITM, and App ID are all present.
+     * Auto-starts the session if token, server URL, RITM, and App ID are all present.
      */
     public synchronized void checkAndAutoStartSession() {
         String r = ritm != null ? ritm.trim() : "";
         String a = applicationId != null ? applicationId.trim() : "";
         String k = apiKey != null ? apiKey.trim() : "";
+        String u = serverUrl != null ? serverUrl.trim() : "";
 
-        if (!r.isEmpty() && !a.isEmpty() && !k.isEmpty()) {
+        if (!r.isEmpty() && !a.isEmpty() && !k.isEmpty() && !u.isEmpty()) {
             if (!recordingEnabled.get()) {
                 startSession(r, a, allocatedHours);
             }
@@ -232,7 +250,7 @@ public class SessionManager {
     }
 
     public boolean isRecordingEnabled() {
-        return recordingEnabled.get() && !ritm.trim().isEmpty() && !applicationId.trim().isEmpty() && (!apiKey.trim().isEmpty() || isTokenVerified);
+        return recordingEnabled.get() && !ritm.trim().isEmpty() && !applicationId.trim().isEmpty() && (!apiKey.trim().isEmpty() || isTokenVerified) && !serverUrl.trim().isEmpty();
     }
 
     public synchronized void startSession(String ritm, String applicationId, double effortHours) {
@@ -284,7 +302,7 @@ public class SessionManager {
     }
 
     public synchronized boolean shouldPromptForActivation() {
-        if (isRecordingEnabled() || apiKey.trim().isEmpty()) {
+        if (isRecordingEnabled() || apiKey.trim().isEmpty() || serverUrl.trim().isEmpty()) {
             return false;
         }
         long now = System.currentTimeMillis();
@@ -321,10 +339,11 @@ public class SessionManager {
     public double getAllocatedHours() { return allocatedHours; }
     public String getServerUrl() { return serverUrl; }
     public void setServerUrl(String serverUrl) {
-        this.serverUrl = serverUrl.trim();
+        this.serverUrl = serverUrl != null ? serverUrl.trim() : "";
         if (api != null) {
             try { api.persistence().preferences().setString("swatcher.serverUrl", this.serverUrl); } catch (Exception ignored) {}
         }
+        checkAndAutoStartSession();
     }
 
     public String getApiKey() { return apiKey; }

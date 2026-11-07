@@ -54,7 +54,9 @@ public class SwatcherTab extends JPanel {
         // Welcome / Auth Status Banner
         JPanel authBanner = new JPanel(new BorderLayout());
         authBanner.setBorder(BorderFactory.createEmptyBorder(4, 0, 6, 0));
-        welcomeLabel = new JLabel("Checking API Token authentication with central server...");
+        welcomeLabel = new JLabel(SessionManager.getInstance().getServerUrl().isEmpty()
+                ? "Central Server URL required. Please configure below."
+                : "Checking API Token authentication with central server...");
         welcomeLabel.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
         welcomeLabel.setForeground(new Color(156, 163, 175));
         authBanner.add(welcomeLabel, BorderLayout.WEST);
@@ -105,6 +107,7 @@ public class SwatcherTab extends JPanel {
         controlsBox.add(new JLabel("Central Server URL:"), gbc);
         gbc.gridx = 3;
         serverUrlField = new JTextField(SessionManager.getInstance().getServerUrl(), 20);
+        serverUrlField.setToolTipText("e.g. https://swatcher.corp.internal:9090");
         controlsBox.add(serverUrlField, gbc);
 
         // Row 3: Actions
@@ -157,9 +160,13 @@ public class SwatcherTab extends JPanel {
                 String r = ritmField.getText().trim();
                 String a = appIdField.getText().trim();
                 String k = new String(apiKeyField.getPassword()).trim();
+                String u = serverUrlField.getText().trim();
                 double effort = 40.0;
                 try { effort = Double.parseDouble(effortField.getText().trim()); } catch (Exception ignored) {}
 
+                if (!u.isEmpty()) {
+                    SessionManager.getInstance().setServerUrl(u);
+                }
                 if (!k.isEmpty()) {
                     SessionManager.getInstance().setApiKey(k);
                 }
@@ -177,6 +184,7 @@ public class SwatcherTab extends JPanel {
         ritmField.getDocument().addDocumentListener(autoEnableListener);
         appIdField.getDocument().addDocumentListener(autoEnableListener);
         apiKeyField.getDocument().addDocumentListener(autoEnableListener);
+        serverUrlField.getDocument().addDocumentListener(autoEnableListener);
 
         // Wire session manager listeners
         SessionManager.getInstance().addListener(new SessionManager.SessionStateListener() {
@@ -207,6 +215,11 @@ public class SwatcherTab extends JPanel {
     private void handleVerifyAndSaveKey() {
         String token = new String(apiKeyField.getPassword()).trim();
         String url = serverUrlField.getText().trim();
+
+        if (url.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please enter your Central Server URL (e.g. https://swatcher.corp.internal:9090).", "Server URL Required", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
 
         if (token.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Please enter your Swatcher API Key.", "Input Required", JOptionPane.WARNING_MESSAGE);
@@ -246,9 +259,14 @@ public class SwatcherTab extends JPanel {
             String ritm = ritmField.getText().trim();
             String appId = appIdField.getText().trim();
             String token = new String(apiKeyField.getPassword()).trim();
+            String url = serverUrlField.getText().trim();
             double effort = 40.0;
             try { effort = Double.parseDouble(effortField.getText().trim()); } catch (Exception ignored) {}
 
+            if (url.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Please configure your Central Server URL (e.g. https://swatcher.corp.internal:9090).", "Server URL Required", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
             if (token.isEmpty()) {
                 JOptionPane.showMessageDialog(this, "Please configure your Swatcher API Token (issued by AppSec Leadership).", "API Token Required", JOptionPane.WARNING_MESSAGE);
                 return;
@@ -258,7 +276,7 @@ public class SwatcherTab extends JPanel {
                 return;
             }
 
-            SessionManager.getInstance().setServerUrl(serverUrlField.getText().trim());
+            SessionManager.getInstance().setServerUrl(url);
             SessionManager.getInstance().setApiKey(token);
             SessionManager.getInstance().startSession(ritm, appId, effort);
         }
@@ -292,6 +310,8 @@ public class SwatcherTab extends JPanel {
     }
 
     private void updateStatusLabel() {
+        String sUrl = SessionManager.getInstance().getServerUrl();
+        String apiKey = SessionManager.getInstance().getApiKey();
         boolean recording = SessionManager.getInstance().isRecordingEnabled();
         boolean online = TrafficDispatcher.getInstance().isServerOnline();
         boolean authOk = TrafficDispatcher.getInstance().isAuthValid();
@@ -299,7 +319,19 @@ public class SwatcherTab extends JPanel {
         String ritm = SessionManager.getInstance().getRitm();
         String appId = SessionManager.getInstance().getApplicationId();
 
-        if (!recording) {
+        if (sUrl == null || sUrl.trim().isEmpty()) {
+            statusLabel.setText("STATUS: SERVER URL REQUIRED");
+            statusLabel.setForeground(new Color(245, 158, 11)); // Amber
+            toggleBtn.setText("Start Recording Session");
+            toggleBtn.setBackground(new Color(156, 163, 175)); // Gray
+            toggleBtn.setForeground(Color.BLACK);
+        } else if (apiKey == null || apiKey.trim().isEmpty()) {
+            statusLabel.setText("STATUS: API TOKEN REQUIRED");
+            statusLabel.setForeground(new Color(245, 158, 11)); // Amber
+            toggleBtn.setText("Start Recording Session");
+            toggleBtn.setBackground(new Color(156, 163, 175)); // Gray
+            toggleBtn.setForeground(Color.BLACK);
+        } else if (!recording) {
             statusLabel.setText("STATUS: PAUSED");
             statusLabel.setForeground(new Color(239, 68, 68)); // Red
             toggleBtn.setText("Start Recording Session");
