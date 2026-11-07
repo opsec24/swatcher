@@ -51,7 +51,15 @@ public class NetworkClient {
      */
     public static HttpURLConnection openConnection(String targetUrl) throws IOException {
         URL url = URI.create(targetUrl).toURL();
-        Proxy proxy = resolveProxy();
+        String host = url.getHost();
+        boolean isLoopback = host != null && (host.equalsIgnoreCase("localhost")
+                || host.equals("127.0.0.1")
+                || host.startsWith("127.")
+                || host.equals("::1")
+                || host.equals("0.0.0.0"));
+
+        // Corporate forward proxies must never be used for localhost/loopback destinations
+        Proxy proxy = isLoopback ? null : resolveProxy();
 
         HttpURLConnection conn = (proxy != null)
                 ? (HttpURLConnection) url.openConnection(proxy)

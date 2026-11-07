@@ -105,4 +105,18 @@ public class OfflineQueueManagerTest {
         assertEquals(1, remaining.size());
         assertEquals("ev-3", remaining.get(0).event_id);
     }
+
+    @Test
+    public void testResetQueue() {
+        List<TrafficEvent> events = new ArrayList<>();
+        TrafficEvent ev = new TrafficEvent();
+        ev.event_id = "ev-corrupt";
+        events.add(ev);
+        queueManager.appendEvents(events);
+        assertTrue(queueManager.hasPendingEvents());
+
+        queueManager.resetQueue();
+        assertEquals(0, queueManager.getOfflineCount());
+        assertFalse(queueManager.hasPendingEvents());
+    }
 }

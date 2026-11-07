@@ -154,6 +154,13 @@ public class OfflineQueueManager {
         }
     }
 
+    public synchronized void resetQueue() {
+        if (queueFile.exists()) {
+            queueFile.delete();
+        }
+        offlineCount.set(0);
+    }
+
     public long getOfflineCount() {
         return Math.max(0, offlineCount.get());
     }

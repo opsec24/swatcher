@@ -349,7 +349,12 @@ public class SessionManager {
         String clean = url.trim();
         if (clean.isEmpty()) return "";
         if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
-            clean = "https://" + clean;
+            if (clean.startsWith("localhost") || clean.startsWith("127.0.0.1")
+                    || clean.contains(":9090") || clean.contains(":8080") || clean.contains(":3000") || clean.contains(":5000")) {
+                clean = "http://" + clean;
+            } else {
+                clean = "https://" + clean;
+            }
         }
         return clean;
     }

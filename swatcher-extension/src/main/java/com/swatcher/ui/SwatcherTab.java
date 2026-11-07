@@ -278,7 +278,7 @@ public class SwatcherTab extends JPanel {
         TrafficDispatcher.getInstance().addLogListener(this::appendConsoleLog);
 
         // Initial console greetings
-        appendConsoleLog("swatcher Burp Suite Traffic Collector v1.2.0 loaded.");
+        appendConsoleLog("swatcher Burp Suite Traffic Collector v1.2.1 loaded.");
         if (!SessionManager.getInstance().getServerUrl().isEmpty()) {
             appendConsoleLog("Configured Central Server: " + SessionManager.getInstance().getServerUrl());
         }
@@ -446,10 +446,16 @@ public class SwatcherTab extends JPanel {
             toggleBtn.setText("Pause Recording");
             toggleBtn.setBackground(new Color(239, 68, 68)); // Red
             toggleBtn.setForeground(Color.WHITE);
-        } else if (!online || offline > 0) {
+        } else if (!online) {
             String countNote = offline > 0 ? " (" + offline + " queued locally)" : "";
-            statusLabel.setText("STATUS: SAVING OFFLINE - Server Offline" + countNote);
+            statusLabel.setText("STATUS: SAVING OFFLINE - Central Server Offline" + countNote);
             statusLabel.setForeground(new Color(245, 158, 11)); // Amber
+            toggleBtn.setText("Pause Recording");
+            toggleBtn.setBackground(new Color(239, 68, 68)); // Red
+            toggleBtn.setForeground(Color.WHITE);
+        } else if (offline > 0) {
+            statusLabel.setText("STATUS: RECORDING (Draining " + offline + " offline logs...)");
+            statusLabel.setForeground(new Color(59, 130, 246)); // Blue
             toggleBtn.setText("Pause Recording");
             toggleBtn.setBackground(new Color(239, 68, 68)); // Red
             toggleBtn.setForeground(Color.WHITE);

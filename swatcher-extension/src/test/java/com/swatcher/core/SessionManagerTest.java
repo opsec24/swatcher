@@ -52,8 +52,14 @@ public class SessionManagerTest {
 
     @Test
     public void testServerUrlNormalization() {
-        sessionManager.setServerUrl("swatcher.corp.internal:9090");
-        assertEquals("https://swatcher.corp.internal:9090", sessionManager.getServerUrl());
+        sessionManager.setServerUrl("swatcher.corp.internal");
+        assertEquals("https://swatcher.corp.internal", sessionManager.getServerUrl());
+
+        sessionManager.setServerUrl("127.0.0.1:9090");
+        assertEquals("http://127.0.0.1:9090", sessionManager.getServerUrl());
+
+        sessionManager.setServerUrl("localhost:9090");
+        assertEquals("http://localhost:9090", sessionManager.getServerUrl());
 
         sessionManager.setServerUrl("http://127.0.0.1:9090");
         assertEquals("http://127.0.0.1:9090", sessionManager.getServerUrl());

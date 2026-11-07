@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.swatcher.model.TrafficEvent;
 
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -207,7 +208,13 @@ public class TrafficDispatcher {
 
             while (offlineQueue.hasPendingEvents() && pass < maxChunksPerPass) {
                 List<TrafficEvent> chunk = offlineQueue.peekBatch(100); // 100 events per replay chunk
-                if (chunk.isEmpty()) break;
+                if (chunk.isEmpty()) {
+                    // Corrupted lines or desynchronized counter: reset to prevent infinite drain loop
+                    offlineQueue.resetQueue();
+                    notifyStats(true);
+                    notifyLog("✓ Offline store synchronized. Resumed live recording mode.");
+                    break;
+                }
 
                 UploadResult result = executeHttpBatchUpload(chunk);
                 if (result == UploadResult.SUCCESS) {
@@ -252,16 +259,29 @@ public class TrafficDispatcher {
 
         HttpURLConnection conn = null;
         try {
+            String engRitm = SessionManager.getInstance().getRitm();
+            String engAppId = SessionManager.getInstance().getApplicationId();
+            double engHours = SessionManager.getInstance().getAllocatedHours();
+            String sessId = SessionManager.getInstance().getCurrentSessionId();
+
+            // When replaying offline events, fallback to event's recorded engagement if current session is blank
+            if ((engRitm.isEmpty() || engAppId.isEmpty()) && !batch.isEmpty() && batch.get(0).engagement != null) {
+                if (engRitm.isEmpty() && batch.get(0).engagement.ritm != null) engRitm = batch.get(0).engagement.ritm;
+                if (engAppId.isEmpty() && batch.get(0).engagement.application_id != null) engAppId = batch.get(0).engagement.application_id;
+                if (engHours <= 0 && batch.get(0).engagement.allocated_hours > 0) engHours = batch.get(0).engagement.allocated_hours;
+            }
+            if (sessId.isEmpty() && !batch.isEmpty() && batch.get(0).session_id != null) {
+                sessId = batch.get(0).session_id;
+            }
+
             Map<String, Object> payload = new HashMap<>();
             payload.put("batch", batch);
-            payload.put("session_id", SessionManager.getInstance().getCurrentSessionId());
+            payload.put("session_id", sessId);
             payload.put("tester", new TrafficEvent.TesterInfo(
                 SessionManager.getInstance().getTesterMachine()
             ));
             payload.put("engagement", new TrafficEvent.EngagementInfo(
-                SessionManager.getInstance().getRitm(),
-                SessionManager.getInstance().getApplicationId(),
-                SessionManager.getInstance().getAllocatedHours()
+                engRitm, engAppId, engHours
             ));
 
             String jsonPayload = gson.toJson(payload);
@@ -278,14 +298,14 @@ public class TrafficDispatcher {
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
             conn.setRequestProperty("Content-Encoding", "gzip");
-            conn.setRequestProperty("User-Agent", "swatcher-burp-plugin/1.2.0");
+            conn.setRequestProperty("User-Agent", "swatcher-burp-plugin/1.2.1");
 
             if (apiKey != null && !apiKey.isEmpty()) {
                 conn.setRequestProperty("Authorization", "Bearer " + apiKey);
             }
 
-            conn.setConnectTimeout(2500);
-            conn.setReadTimeout(5000);
+            conn.setConnectTimeout(3000);
+            conn.setReadTimeout(6000);
             conn.setDoOutput(true);
 
             try (OutputStream os = conn.getOutputStream()) {
@@ -297,10 +317,23 @@ public class TrafficDispatcher {
                 return UploadResult.SUCCESS;
             } else if (code == 401 || code == 403) {
                 return UploadResult.AUTH_REJECTED;
+            } else if (code == 400) {
+                // Malformed record in offline buffer: drop poison-pill batch so queue does not lock indefinitely
+                notifyLog("⚠️ Discarded unprocessable offline batch (HTTP 400 Bad Request). Resuming live queue.");
+                return UploadResult.SUCCESS;
             } else {
+                String errDetail = "";
+                try (InputStream es = conn.getErrorStream()) {
+                    if (es != null) {
+                        errDetail = " - " + new String(es.readAllBytes(), StandardCharsets.UTF_8);
+                    }
+                } catch (Exception ignored) {}
+                notifyLog("⚠️ Ingestion upload error (HTTP " + code + errDetail + ")");
                 return UploadResult.NETWORK_OFFLINE;
             }
         } catch (Exception e) {
+            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            notifyLog("⚠️ Server connection error: " + msg);
             return UploadResult.NETWORK_OFFLINE;
         } finally {
             if (conn != null) {
