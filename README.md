@@ -4,6 +4,13 @@ Centralized traffic logging and engagement tracking for Burp Suite. Captures in-
 
 ---
 
+<img width="1887" height="663" alt="image" src="https://github.com/user-attachments/assets/ab47bc5f-49da-4e37-9b2a-e6ef5be365b3" />
+---
+<img width="1902" height="617" alt="image" src="https://github.com/user-attachments/assets/7a8aa521-ec63-4412-b3c0-e2f834b58466" />
+---
+<img width="1757" height="907" alt="image" src="https://github.com/user-attachments/assets/2fdb784e-63ce-4452-9d18-64bc7c2bc600" />
+
+---
 ## Architecture
 
 - **Central Server**: Node.js & PostgreSQL backend providing the ingestion API and web dashboard.
