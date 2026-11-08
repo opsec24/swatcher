@@ -51,7 +51,7 @@ Dashboard URL: `http://<SERVER-IP>:9090`
 
 ### Install the Extension
 
-1. Download `swatcher-1.2.2.jar` from the [Releases](https://github.com/opsec24/swatcher/releases) page (or build locally: `cd swatcher-extension && ./gradlew jar`).
+1. Download `swatcher-1.2.2.jar` from the [Releases](https://github.com/opsec24/swatcher/releases) page or use `release/swatcher-1.2.2.jar` (or build locally: `cd swatcher-extension && ./gradlew jar`).
 2. In Burp Suite Pro, go to **Extensions** > **Installed** > **Add**.
 3. Set **Extension type** to `Java` and select `swatcher-1.2.2.jar`.
 

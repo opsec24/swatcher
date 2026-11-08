@@ -173,17 +173,17 @@ public class SwatcherTab extends JPanel {
         topPanel.add(statsPanel);
         add(topPanel, BorderLayout.NORTH);
 
-        // Center: High-Performance Lightweight Operational Console
+        // Center: Terminal Diagnostic Stream Console
         consoleArea = new JTextArea();
         consoleArea.setEditable(false);
         consoleArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
-        consoleArea.setBackground(new Color(24, 24, 27)); // Modern dark zinc
-        consoleArea.setForeground(new Color(228, 228, 231)); // Crisp zinc text
-        consoleArea.setCaretColor(Color.WHITE);
+        consoleArea.setBackground(new Color(7, 23, 44)); // Deepest Navy #07172C
+        consoleArea.setForeground(new Color(228, 228, 231)); // Crisp terminal text
+        consoleArea.setCaretColor(new Color(255, 196, 54)); // Gold caret #FFC436
         consoleArea.setMargin(new Insets(8, 10, 8, 10));
 
         JScrollPane consoleScrollPane = new JScrollPane(consoleArea);
-        consoleScrollPane.setBorder(BorderFactory.createTitledBorder("swatcher System Activity & Diagnostics Console"));
+        consoleScrollPane.setBorder(BorderFactory.createTitledBorder("swatcher Telemetry Stream & Diagnostics Console"));
 
         JPanel centerPanel = new JPanel(new BorderLayout(0, 4));
         centerPanel.add(consoleScrollPane, BorderLayout.CENTER);
@@ -278,7 +278,7 @@ public class SwatcherTab extends JPanel {
         TrafficDispatcher.getInstance().addLogListener(this::appendConsoleLog);
 
         // Initial console greetings
-        appendConsoleLog("swatcher Burp Suite Traffic Collector v1.2.2 loaded.");
+        appendConsoleLog("swatcher Burp Suite Traffic Collector v1.2.2 initialized.");
         if (!SessionManager.getInstance().getServerUrl().isEmpty()) {
             appendConsoleLog("Configured Central Server: " + SessionManager.getInstance().getServerUrl());
         }
@@ -298,7 +298,7 @@ public class SwatcherTab extends JPanel {
     public void appendConsoleLog(String message) {
         SwingUtilities.invokeLater(() -> {
             String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
-            consoleArea.append("[" + time + "] " + message + "\n");
+            consoleArea.append("[" + time + "] $ " + message + "\n");
             int lineCount = consoleArea.getLineCount();
             if (lineCount > 300) {
                 try {

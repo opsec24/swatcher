@@ -16,7 +16,7 @@ public class ActivationModal {
         SwingUtilities.invokeLater(() -> {
             try {
                 Window owner = (parent != null) ? SwingUtilities.getWindowAncestor(parent) : null;
-                JDialog dialog = new JDialog(owner, "swatcher - Recording Inactive", Dialog.ModalityType.MODELESS);
+                JDialog dialog = new JDialog(owner, "swatcher - Inactive Session Detected", Dialog.ModalityType.MODELESS);
                 dialog.setLayout(new BorderLayout(15, 15));
                 dialog.setResizable(false);
                 dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
@@ -35,17 +35,17 @@ public class ActivationModal {
             contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
             contentPanel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
 
-            JLabel titleLabel = new JLabel("<html><b style='font-size:13px; color:#4f46e5;'>Target Traffic Detected (Recording Disabled)</b></html>");
+            JLabel titleLabel = new JLabel("<html><b style='font-size:13px; color:#0A2240;'>swatcher // In-Scope Target Traffic Detected</b></html>");
             JLabel hostLabel = new JLabel("In-Scope Target: " + (detectedHost != null ? detectedHost : "Authorized target"));
             hostLabel.setFont(new Font(Font.MONOSPACED, Font.BOLD, 12));
 
             String welcomeSub = "";
             if (SessionManager.getInstance().isTokenVerified()) {
-                welcomeSub = "<div style='color:#10b981; font-weight:bold; margin-top:4px;'>Pentester: "
+                welcomeSub = "<div style='color:#0C356A; font-weight:bold; margin-top:4px;'>Authenticated Pentester: "
                         + SessionManager.getInstance().getAuthenticatedFullName() + " (" + SessionManager.getInstance().getAuthenticatedUsername() + ")</div>";
             }
 
-            JLabel descLabel = new JLabel("<html><div style='width:360px; margin-top:6px; color:#555;'>"
+            JLabel descLabel = new JLabel("<html><div style='width:360px; margin-top:6px; color:#4B5563;'>"
                     + welcomeSub
                     + "Traffic recording is currently paused. Please confirm the ServiceNow RITM, Application ID, "
                     + "and allocated effort hours for this engagement."
