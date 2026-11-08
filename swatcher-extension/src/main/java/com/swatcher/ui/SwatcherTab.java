@@ -278,7 +278,7 @@ public class SwatcherTab extends JPanel {
         TrafficDispatcher.getInstance().addLogListener(this::appendConsoleLog);
 
         // Initial console greetings
-        appendConsoleLog("swatcher Burp Suite Traffic Collector v1.2.2 initialized.");
+        appendConsoleLog("swatcher Burp Suite Traffic Collector v1.2.3 initialized.");
         if (!SessionManager.getInstance().getServerUrl().isEmpty()) {
             appendConsoleLog("Configured Central Server: " + SessionManager.getInstance().getServerUrl());
         }
