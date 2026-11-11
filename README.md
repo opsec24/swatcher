@@ -33,17 +33,27 @@ chmod +x run.sh
 
 The script checks for Docker, creates a `.env` configuration file with random secrets if one doesn't exist, and starts both the database and application containers on port `9090`.
 
+#### Behind a Corporate Proxy
+If your server operates in a restricted corporate environment, pass the optional `--proxy` flag (or export `$http_proxy` in your shell):
+
+```bash
+./run.sh --proxy http://proxy.corp.internal:8080
+```
+This automatically configures the Docker daemon service (`systemd`), BuildKit image metadata resolution, and container build steps (`apk` / `npm`) with strict internal `NO_PROXY` bypasses.
+
 Dashboard URL: `http://<SERVER-IP>:9090`
 
 ### Server Management Commands
 
 ```bash
-./run.sh --logs       # View live streaming server logs
-./run.sh --status     # Check container health and status
-./run.sh --update     # Pull latest release from git and rebuild container without cache
-./run.sh --restart    # Restart containers
-./run.sh --stop       # Stop containers safely (data persists in postgres volume)
-./run.sh --reset      # Wipe containers and database volume for a clean start
+./run.sh --logs                           # View live streaming server logs
+./run.sh --status                         # Check container health and status
+./run.sh --update                         # Pull latest release from git and rebuild container without cache
+./run.sh --update --proxy http://proxy:8080 # Update and rebuild behind corporate proxy
+./run.sh --restart                        # Restart containers
+./run.sh --stop                           # Stop containers safely (data persists in postgres volume)
+./run.sh --reset                          # Wipe containers and database volume for a clean start
+./run.sh --help                           # View all options and examples
 ```
 
 ### Initial Dashboard Setup

@@ -39,7 +39,93 @@ if [ "$(id -u)" -eq 0 ] || ! command -v sudo >/dev/null 2>&1; then
 fi
 
 # ------------------------------------------------------------------------------
-# Subcommand Handlers
+# Argument Parsing & Option Flags
+# ------------------------------------------------------------------------------
+ACTION="up"
+CLI_PROXY=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --proxy|-p)
+      if [ -n "${2:-}" ] && [[ "$2" != --* ]]; then
+        CLI_PROXY="$2"
+        shift 2
+      else
+        echo -e "${RED}[✘] Error: --proxy requires a URL argument (e.g. --proxy http://proxy.corp.internal:8080)${NC}"
+        exit 1
+      fi
+      ;;
+    --proxy=*)
+      CLI_PROXY="${1#*=}"
+      shift
+      ;;
+    --logs|-l)
+      ACTION="logs"
+      shift
+      ;;
+    --status|-s)
+      ACTION="status"
+      shift
+      ;;
+    --stop)
+      ACTION="stop"
+      shift
+      ;;
+    --restart)
+      ACTION="restart"
+      shift
+      ;;
+    --update|-u)
+      ACTION="update"
+      shift
+      ;;
+    --reset)
+      ACTION="reset"
+      shift
+      ;;
+    --help|-h)
+      ACTION="help"
+      shift
+      ;;
+    *)
+      echo -e "${RED}[✘] Unknown option: $1${NC}"
+      echo -e "Use ${CYAN}./run.sh --help${NC} to view available options."
+      exit 1
+      ;;
+  esac
+done
+
+if [ "$ACTION" = "help" ]; then
+  print_banner
+  echo -e "Usage: ./run.sh [options]"
+  echo ""
+  echo -e "${BOLD}DEPLOYMENT & RUNTIME:${NC}"
+  echo -e "  (no args)             Build and launch enterprise swatcher via Docker Compose (PostgreSQL 16)"
+  echo -e "  --proxy, -p <url>     (Optional) Configure corporate HTTP/HTTPS proxy for Docker daemon,"
+  echo -e "                        BuildKit image metadata, and container build steps (apk / npm)"
+  echo -e "                        Auto-detects from \$HTTP_PROXY / \$http_proxy or .env if omitted"
+  echo ""
+  echo -e "${BOLD}MANAGEMENT COMMANDS:${NC}"
+  echo -e "  --logs, -l            View streaming live container logs"
+  echo -e "  --status, -s          Check running status and health of containers"
+  echo -e "  --restart             Restart application containers"
+  echo -e "  --update, -u          Pull latest release from git and rebuild container without cache"
+  echo -e "  --reset               Destroy containers and persistent PostgreSQL volume for a clean start"
+  echo -e "  --stop                Gracefully stop all containers"
+  echo -e "  --help, -h            Show this help message"
+  echo ""
+  echo -e "${BOLD}EXAMPLES:${NC}"
+  echo -e "  ${CYAN}./run.sh${NC}                                      # Standard launch (auto-detects proxy if set)"
+  echo -e "  ${CYAN}./run.sh --proxy http://10.0.0.1:8080${NC}         # Launch behind corporate HTTP proxy"
+  echo -e "  ${CYAN}./run.sh -p http://user:pass@proxy:8080${NC}       # Proxy with basic authentication"
+  echo -e "  ${CYAN}./run.sh --update --proxy http://10.0.0.1:8080${NC}  # Update and rebuild behind corporate proxy"
+  echo -e "  ${CYAN}./run.sh --logs${NC}                               # Stream live container logs"
+  echo ""
+  exit 0
+fi
+
+# ------------------------------------------------------------------------------
+# Docker and Docker Compose Command Resolution
 # ------------------------------------------------------------------------------
 DOCKER_CMD="docker"
 if ! docker info >/dev/null 2>&1; then
@@ -57,35 +143,143 @@ if ! $COMPOSE_CMD version >/dev/null 2>&1; then
   fi
 fi
 
-case "$1" in
-  --logs|-l)
+# ------------------------------------------------------------------------------
+# Corporate Proxy Configuration Helper
+# ------------------------------------------------------------------------------
+configure_corporate_proxy() {
+  local PROXY="${CLI_PROXY:-}"
+
+  # 1. Check CLI argument first, then terminal environment variables
+  if [ -z "$PROXY" ]; then
+    PROXY="${HTTPS_PROXY:-${https_proxy:-${HTTP_PROXY:-${http_proxy:-}}}}"
+  fi
+
+  # 2. Check .env file if it exists
+  if [ -z "$PROXY" ] && [ -f .env ]; then
+    PROXY=$(grep -E '^(HTTP_PROXY|HTTPS_PROXY)=' .env 2>/dev/null | head -n1 | cut -d '=' -f2- | tr -d '"'\'' ' || true)
+  fi
+
+  if [ -n "$PROXY" ]; then
+    echo -e "${BLUE}--> Configuring corporate proxy for Docker: ${CYAN}${PROXY}${NC}"
+
+    # Export for current shell session (used by curl, git, apt-get, compose)
+    export HTTP_PROXY="$PROXY"
+    export HTTPS_PROXY="$PROXY"
+    export http_proxy="$PROXY"
+    export https_proxy="$PROXY"
+
+    local NO_PROXY_VAL="localhost,127.0.0.1,swatcher-db,swatcher-app,swatcher-network,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+    export NO_PROXY="$NO_PROXY_VAL"
+    export no_proxy="$NO_PROXY_VAL"
+
+    # A. Configure Docker Daemon systemd service (pulling images from registries)
+    local SYSTEMD_DIR="/etc/systemd/system/docker.service.d"
+    local CONF_FILE="${SYSTEMD_DIR}/http-proxy.conf"
+    local RESTART_DAEMON=false
+
+    if command -v systemctl >/dev/null 2>&1; then
+      if [ ! -f "$CONF_FILE" ] || ! grep -q "$PROXY" "$CONF_FILE" 2>/dev/null; then
+        $SUDO_CMD mkdir -p "$SYSTEMD_DIR"
+        cat <<EOF | $SUDO_CMD tee "$CONF_FILE" >/dev/null
+[Service]
+Environment="HTTP_PROXY=${PROXY}"
+Environment="HTTPS_PROXY=${PROXY}"
+Environment="NO_PROXY=${NO_PROXY_VAL}"
+EOF
+        RESTART_DAEMON=true
+      fi
+
+      if [ "$RESTART_DAEMON" = true ]; then
+        echo -e "  ${BLUE}--> Reloading Docker daemon service with proxy config...${NC}"
+        $SUDO_CMD systemctl daemon-reload 2>/dev/null || true
+        $SUDO_CMD systemctl restart docker 2>/dev/null || true
+        sleep 2
+      fi
+    fi
+
+    # B. Configure Docker CLI / BuildKit (resolving metadata and container RUN steps)
+    for DOCKER_DIR in "$HOME/.docker" "/root/.docker"; do
+      if [ "$DOCKER_DIR" = "/root/.docker" ] && [ -z "$SUDO_CMD" ] && [ "$(id -u)" -ne 0 ]; then
+        continue
+      fi
+      $SUDO_CMD mkdir -p "$DOCKER_DIR" 2>/dev/null || mkdir -p "$DOCKER_DIR" 2>/dev/null || true
+
+      local CONFIG_FILE="${DOCKER_DIR}/config.json"
+      if [ -f "$CONFIG_FILE" ] && command -v jq >/dev/null 2>&1; then
+        local TMP_CFG
+        TMP_CFG=$(mktemp)
+        jq --arg p "$PROXY" --arg np "$NO_PROXY_VAL" \
+           '.proxies.default = {"httpProxy": $p, "httpsProxy": $p, "noProxy": $np}' \
+           "$CONFIG_FILE" > "$TMP_CFG" 2>/dev/null && $SUDO_CMD mv "$TMP_CFG" "$CONFIG_FILE" 2>/dev/null || rm -f "$TMP_CFG"
+      else
+        cat <<EOF | $SUDO_CMD tee "$CONFIG_FILE" >/dev/null
+{
+  "proxies": {
+    "default": {
+      "httpProxy": "${PROXY}",
+      "httpsProxy": "${PROXY}",
+      "noProxy": "${NO_PROXY_VAL}"
+    }
+  }
+}
+EOF
+      fi
+    done
+
+    # C. If CLI_PROXY was explicitly provided and .env exists, persist it
+    if [ -n "$CLI_PROXY" ] && [ -f .env ]; then
+      if grep -qE '^HTTP_PROXY=' .env 2>/dev/null; then
+        sed "s|^HTTP_PROXY=.*|HTTP_PROXY=${CLI_PROXY}|" .env > .env.tmp && mv .env.tmp .env
+      else
+        echo "HTTP_PROXY=${CLI_PROXY}" >> .env
+      fi
+      if grep -qE '^HTTPS_PROXY=' .env 2>/dev/null; then
+        sed "s|^HTTPS_PROXY=.*|HTTPS_PROXY=${CLI_PROXY}|" .env > .env.tmp && mv .env.tmp .env
+      else
+        echo "HTTPS_PROXY=${CLI_PROXY}" >> .env
+      fi
+      if ! grep -qE '^NO_PROXY=' .env 2>/dev/null; then
+        echo "NO_PROXY=${NO_PROXY_VAL}" >> .env
+      fi
+    fi
+
+    echo -e "  ${GREEN}[✔] Docker daemon and BuildKit proxy configuration active.${NC}"
+  fi
+}
+
+# ------------------------------------------------------------------------------
+# Action Handlers
+# ------------------------------------------------------------------------------
+case "$ACTION" in
+  logs)
     print_banner
     echo -e "${BLUE}--> Streaming live logs for swatcher containers... (Ctrl+C to exit)${NC}"
     $COMPOSE_CMD logs -f
     exit 0
     ;;
-  --status|-s)
+  status)
     print_banner
     echo -e "${BLUE}--> Inspecting container status:${NC}"
     $COMPOSE_CMD ps
     exit 0
     ;;
-  --stop)
+  stop)
     print_banner
     echo -e "${YELLOW}--> Stopping all swatcher services...${NC}"
     $COMPOSE_CMD down
     echo -e "${GREEN}[✔] Services stopped safely. Data persists in postgres volume.${NC}"
     exit 0
     ;;
-  --restart)
+  restart)
     print_banner
     echo -e "${BLUE}--> Restarting swatcher services...${NC}"
     $COMPOSE_CMD restart
     echo -e "${GREEN}[✔] Services restarted.${NC}"
     exit 0
     ;;
-  --update|-u)
+  update)
     print_banner
+    configure_corporate_proxy
     echo -e "${BLUE}--> Pulling latest swatcher release from GitHub...${NC}"
     git pull origin main
     echo -e "${BLUE}--> Rebuilding swatcher application container with no-cache...${NC}"
@@ -94,7 +288,7 @@ case "$1" in
     echo -e "${GREEN}[✔] Successfully updated swatcher to $(curl -s http://127.0.0.1:9090/health 2>/dev/null | grep -o '\"version\":\"[^\"]*\"' || echo 'latest').${NC}"
     exit 0
     ;;
-  --reset)
+  reset)
     print_banner
     echo -e "${RED}--> Resetting swatcher: destroying containers and persistent PostgreSQL volume...${NC}"
     $COMPOSE_CMD down -v
@@ -102,24 +296,13 @@ case "$1" in
     echo -e "${GREEN}[✔] Clean reset complete. Re-run ./run.sh to initialize fresh.${NC}"
     exit 0
     ;;
-  --help|-h)
-    print_banner
-    echo -e "Usage: ./run.sh [option]"
-    echo ""
-    echo "Options:"
-    echo "  (no args)    Build and launch enterprise swatcher via Docker Compose (PostgreSQL 16)"
-    echo "  --logs, -l   View streaming container logs"
-    echo "  --status, -s Check running status and health of containers"
-    echo "  --restart    Restart application containers"
-    echo "  --update, -u Pull latest release from git and rebuild container without cache"
-    echo "  --reset      Destroy containers and volume for a clean fresh start"
-    echo "  --stop       Gracefully stop all containers"
-    echo "  --help, -h   Show this help message"
-    exit 0
+  up)
+    # Default execution continues to STEP 1
     ;;
 esac
 
 print_banner
+configure_corporate_proxy
 
 # ------------------------------------------------------------------------------
 # STEP 1: Verify & Install Host Prerequisites (Kali / Ubuntu / Debian / RHEL / Amazon Linux)
@@ -187,6 +370,9 @@ if ! $DOCKER_CMD info >/dev/null 2>&1; then
   exit 1
 fi
 
+# Ensure corporate proxy is applied to newly verified/started Docker daemon
+configure_corporate_proxy
+
 # Check Docker Compose (v2 plugin or standalone)
 if ! $DOCKER_CMD compose version >/dev/null 2>&1; then
   if command -v docker-compose >/dev/null 2>&1; then
@@ -247,6 +433,17 @@ SESSION_SECRET=${RANDOM_SESSION_SECRET}
 DB_POOL_MAX=30
 DB_SSL=false
 EOF
+
+  local ACTIVE_PROXY="${CLI_PROXY:-${HTTP_PROXY:-${http_proxy:-}}}"
+  if [ -n "$ACTIVE_PROXY" ]; then
+    cat <<EOF >> .env
+
+# Corporate Proxy Configuration
+HTTP_PROXY=${ACTIVE_PROXY}
+HTTPS_PROXY=${ACTIVE_PROXY}
+NO_PROXY=localhost,127.0.0.1,swatcher-db,swatcher-app,swatcher-network,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+EOF
+  fi
 
   chmod 600 .env 2>/dev/null || true
   echo -e "  ${GREEN}[✔] Created .env with secure random PostgreSQL passwords.${NC}"
