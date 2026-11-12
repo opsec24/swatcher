@@ -1,5 +1,9 @@
 const db = require('../db');
 
+// Authoritative time expression: strictly enforces server-side receipt (created_at)
+// while gracefully falling back to timestamp for legacy records.
+const TIME_COL = "COALESCE(NULLIF(created_at, ''), timestamp)";
+
 function calculateActiveMinutes(timestamps, maxGapMinutes = 10, defaultBlockMinutes = 1) {
   if (!timestamps || timestamps.length === 0) return 0;
   if (timestamps.length === 1) return defaultBlockMinutes;
@@ -50,7 +54,7 @@ async function getOverview() {
   const currentMonthPrefix = new Date().toISOString().slice(0, 7);
   // Bucket by minute to avoid loading millions of individual timestamps into Node memory
   const currentMonthBuckets = await db.all(
-    'SELECT DISTINCT SUBSTR(timestamp, 1, 16) AS m FROM traffic_logs WHERE timestamp LIKE ? ORDER BY m ASC',
+    `SELECT DISTINCT SUBSTR(${TIME_COL}, 1, 16) AS m FROM traffic_logs WHERE ${TIME_COL} LIKE ? ORDER BY m ASC`,
     [`${currentMonthPrefix}%`]
   );
   const currentMonthActiveMins = calculateActiveMinutes(currentMonthBuckets.map(r => r.m + ':00.000Z'));
@@ -70,9 +74,9 @@ async function getOverview() {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   // Fetch bucketed minute activity grouped by tool class in a single high-speed query
   const activityRows = await db.all(`
-    SELECT SUBSTR(timestamp, 1, 16) AS m, tool
+    SELECT SUBSTR(${TIME_COL}, 1, 16) AS m, tool
     FROM traffic_logs
-    WHERE timestamp >= ?
+    WHERE ${TIME_COL} >= ?
     GROUP BY m, tool
     ORDER BY m ASC
   `, [thirtyDaysAgo]);
@@ -124,7 +128,7 @@ async function getOverview() {
     const activeRitms = activeEngagements.map(e => e.ritm);
     const ritmParamPlaceholders = activeRitms.map(() => '?').join(', ');
     const activeEngMinutesRows = await db.all(`
-      SELECT ritm, SUBSTR(timestamp, 1, 16) AS m
+      SELECT ritm, SUBSTR(${TIME_COL}, 1, 16) AS m
       FROM traffic_logs
       WHERE ritm IN (${ritmParamPlaceholders})
       GROUP BY ritm, m
@@ -183,8 +187,8 @@ async function getEngagementMetrics() {
       ritm,
       COUNT(*) AS total_requests,
       COUNT(DISTINCT host || path) AS unique_endpoints,
-      MIN(timestamp) AS started_at,
-      MAX(timestamp) AS last_activity_at,
+      MIN(${TIME_COL}) AS started_at,
+      MAX(${TIME_COL}) AS last_activity_at,
       ARRAY_AGG(DISTINCT tester_username) AS testers
     FROM traffic_logs
     GROUP BY ritm
@@ -197,7 +201,7 @@ async function getEngagementMetrics() {
 
   // 2. Grouped minute activity buckets across ALL engagements
   const activityRows = await db.all(`
-    SELECT ritm, SUBSTR(timestamp, 1, 16) AS m, tool
+    SELECT ritm, SUBSTR(${TIME_COL}, 1, 16) AS m, tool
     FROM traffic_logs
     GROUP BY ritm, m, tool
     ORDER BY ritm, m ASC
@@ -275,7 +279,7 @@ async function getEngagementDetail(ritm) {
 
   // Bucket activity by minute to keep memory footprint minimal
   const activityRows = await db.all(`
-    SELECT SUBSTR(timestamp, 1, 16) AS m, tool
+    SELECT SUBSTR(${TIME_COL}, 1, 16) AS m, tool
     FROM traffic_logs
     WHERE ritm = ?
     GROUP BY m, tool
@@ -307,14 +311,16 @@ async function getEngagementDetail(ritm) {
 
   // Grouped tester summary with active minutes per tester
   const testerSummaryRows = await db.all(`
-    SELECT tester_username, COUNT(*) AS request_count, MIN(timestamp) AS first_seen, MAX(timestamp) AS last_seen
+    SELECT tester_username, COUNT(*) AS request_count, 
+           MIN(${TIME_COL}) AS first_seen, 
+           MAX(${TIME_COL}) AS last_seen
     FROM traffic_logs
     WHERE ritm = ?
     GROUP BY tester_username
   `, [eng.ritm]);
 
   const testerMinutesRows = await db.all(`
-    SELECT tester_username, SUBSTR(timestamp, 1, 16) AS m
+    SELECT tester_username, SUBSTR(${TIME_COL}, 1, 16) AS m
     FROM traffic_logs
     WHERE ritm = ?
     GROUP BY tester_username, m
@@ -343,7 +349,7 @@ async function getEngagementDetail(ritm) {
   }
 
   const endpoints = await db.all(`
-    SELECT method, host, path, status_code, COUNT(*) AS hits, MAX(timestamp) AS last_hit
+    SELECT method, host, path, status_code, COUNT(*) AS hits, MAX(${TIME_COL}) AS last_hit
     FROM traffic_logs
     WHERE ritm = ?
     GROUP BY method, host, path, status_code
@@ -356,24 +362,24 @@ async function getEngagementDetail(ritm) {
   `, [eng.ritm]);
 
   const latestLog = await db.get(`
-    SELECT MAX(timestamp) AS last_collected_at
+    SELECT MAX(${TIME_COL}) AS last_collected_at
     FROM traffic_logs
     WHERE ritm = ?
   `, [eng.ritm]);
 
   const dailyTimeline = await db.all(`
-    SELECT SUBSTR(timestamp, 1, 10) AS log_date, COUNT(*) AS request_count
+    SELECT SUBSTR(${TIME_COL}, 1, 10) AS log_date, COUNT(*) AS request_count
     FROM traffic_logs
     WHERE ritm = ?
-    GROUP BY SUBSTR(timestamp, 1, 10)
+    GROUP BY SUBSTR(${TIME_COL}, 1, 10)
     ORDER BY log_date ASC
   `, [eng.ritm]);
 
   const hourlyTimeline = await db.all(`
-    SELECT SUBSTR(timestamp, 1, 13) AS log_hour, COUNT(*) AS request_count
+    SELECT SUBSTR(${TIME_COL}, 1, 13) AS log_hour, COUNT(*) AS request_count
     FROM traffic_logs
     WHERE ritm = ?
-    GROUP BY SUBSTR(timestamp, 1, 13)
+    GROUP BY SUBSTR(${TIME_COL}, 1, 13)
     ORDER BY log_hour ASC
   `, [eng.ritm]);
 

@@ -54,4 +54,13 @@ describe('Analytics - calculateActiveMinutes', () => {
     ];
     assert.equal(calculateActiveMinutes(timestamps, 10), 5);
   });
+
+  test('treats burst submissions within the same minute window as single block', () => {
+    const base = new Date('2026-11-01T14:30:00.000Z').getTime();
+    // 50 requests all arriving in the same 10-second burst
+    const burstTimestamps = Array.from({ length: 50 }, (_, i) => 
+      new Date(base + i * 200).toISOString()
+    );
+    assert.equal(calculateActiveMinutes(burstTimestamps, 10), 1);
+  });
 });

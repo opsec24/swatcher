@@ -746,7 +746,14 @@ router.post('/ingest/batch', ingestLimiter, authenticateIngestion, async (req, r
       const resData = item.response || {};
 
       const tool = sanitizePgText((reqData.tool || item.tool || 'PROXY').toUpperCase(), 32);
-      const timestamp = sanitizePgText(reqData.timestamp || item.timestamp || now, 64);
+      const rawTimestamp = reqData.timestamp || item.timestamp || now;
+      let timestamp = sanitizePgText(rawTimestamp, 64);
+      const clientTimeMs = new Date(timestamp).getTime();
+      const serverTimeMs = new Date(now).getTime();
+      // Enforce strict sanity clamping on client-reported timestamp (clamp forward drift > 2 min)
+      if (isNaN(clientTimeMs) || clientTimeMs > serverTimeMs + 120000) {
+        timestamp = now;
+      }
       const method = sanitizePgText((reqData.method || 'GET').toUpperCase(), 64);
       const url = sanitizePgText(reqData.url || '');
 
@@ -851,10 +858,10 @@ router.get('/logs', authenticateLeader, async (req, res) => {
     const safeOffset = Math.max(0, parseInt(offset, 10) || 0);
 
     const query = `
-      SELECT id, event_id, ritm, application_id, tester_username, tool, timestamp, method, url, host, path, status_code, duration_ms, request_body_length, response_body_length 
+      SELECT id, event_id, ritm, application_id, tester_username, tool, timestamp, created_at, method, url, host, path, status_code, duration_ms, request_body_length, response_body_length 
       FROM traffic_logs 
       WHERE ${whereClause} 
-      ORDER BY timestamp DESC 
+      ORDER BY COALESCE(NULLIF(created_at, ''), timestamp) DESC 
       LIMIT ? OFFSET ?
     `;
     const rows = await db.all(query, [...filterParams, safeLimit, safeOffset]);

@@ -201,6 +201,9 @@ const db = {
       CREATE INDEX IF NOT EXISTS idx_traffic_host ON traffic_logs(host);
 
       -- High-Performance Composite Indexes for Enterprise Scale (150+ pentests / 50 testers)
+      CREATE INDEX IF NOT EXISTS idx_traffic_created_at ON traffic_logs(created_at);
+      CREATE INDEX IF NOT EXISTS idx_traffic_ritm_created ON traffic_logs(ritm, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_traffic_tool_created ON traffic_logs(tool, created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_traffic_ritm_time ON traffic_logs(ritm, timestamp DESC);
       CREATE INDEX IF NOT EXISTS idx_traffic_tool_time ON traffic_logs(tool, timestamp DESC);
       CREATE INDEX IF NOT EXISTS idx_traffic_tester_ritm ON traffic_logs(tester_username, ritm);
